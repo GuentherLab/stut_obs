@@ -1,0 +1,18 @@
+conds = make_random_sit(8, 0, 2, [6,6,6,6,6,6,6,6], 100]
+efficiency = flvoice_design_efficiency('conditions',conds);
+
+
+# Red Cross LARGER
+# Timing Logic - Turn off the stimulus replace with red cross
+# Brief delay of 0.5 second
+# Scan trigger ( 1.6 )
+# 0.5 second
+# average oset + timeNoOnset when no voice detected
+# No background
+
+# THE END at THE END
+# Jittering 2 - 3
+# Flexibility in text
+# Unique identifier for the sentences
+# 3.5 seconds to 4 in postOnset
+# get channels working - beep goes on channel and trigger on channel 3

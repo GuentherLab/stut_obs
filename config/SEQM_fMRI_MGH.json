@@ -1,0 +1,36 @@
+{
+    "visual": "fixpoint",
+    "root": "C:\\Users\\splab\\Documents\\SEQ_Multi",
+    "audiopath": "C:\\Users\\splab\\Documents\\SEQ_Multi\\stimuli\\audio\\Adults",
+    "figurespath": "C:\\Users\\splab\\Documents\\SEQ_Multi\\stimuli\\figures",
+    "subject": "SEQM100",
+    "session": 2,
+    "run": 1,
+    "task": "test",
+    "gender": "unspecified",
+    "scan": true,
+    "timePostStim": [
+        0.25,
+        0.75
+    ],
+    "timePostOnset": 4.5,
+    "timeScan": 1.6,
+    "timePreStim": 0.25,
+    "timeMax": 6,
+    "timePreSound": 0,
+    "timePostSound": 0,
+    "rmsThresh": 0.02,
+    "rmsBeepThresh": 0.1,
+    "rmsThreshTimeOnset": 0.02,
+    "rmsThreshTimeOffset": [
+        0.25,
+        0.25
+    ],
+    "prescan": true,
+    "minVoiceOnsetTime": 0.4,
+    "ipatDur": 4.9,
+    "smsDur": 7,
+    "deviceMic": "",
+    "deviceHead": "",
+    "deviceScan": ""
+}
