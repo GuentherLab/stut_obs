@@ -138,9 +138,9 @@ if preFlag
 else % if no preset config file defined
     expParams=struct(...
         'visual', 'orthography', ...
-        'root', 'C:\Users\splab\Documents\SIT-Pilot', ...
+        'root', 'C:\ieeg_stut', ...
         'textpath', fullfile(pwd, 'stimuli', 'text'), ...
-        'subject','SITpilot01',...
+        'subject','sub-example',...
         'session', 1, ...
         'run', 3,...
         'task', 'test', ...
@@ -202,7 +202,7 @@ for n=1:numel(fnames)
     end
 end
 
-out_dropbox = {'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender', 'scan', 'condition'};
+out_dropbox = {'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender', 'scan'};
 for n=1:numel(out_dropbox)
     val=expParams.(out_dropbox{n});
     if ischar(val), fvals_o{n}=val;
@@ -327,7 +327,7 @@ if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite', questdlg(sprintf('Thi
 % read text files and condition labels
 % % % % % % % % % % % % % % % % % Input_files=regexp(fileread(Input_textname),'[\n\r]+','split');
 
-expParams.condition_blocks = {'observed';'unobserved';'unobserved';'observed'}; 
+expParams.condition_blocks = {'observed';'unobserved';'unobserved';'observed'}; % move these params to json config
 expParams.nblocks = length(expParams.condition_blocks); 
 unique_qa = readtable(unique_answers_file,'FileType','text');
 expParams.ntrials = expParams.nblocks * expParams.repetitions_per_word_per_block;
@@ -558,7 +558,7 @@ for itrial = 1:expParams.ntrials
     % trial specific timing parameters with jitter on
     trialData(itrial).question = trials.question{itrial};
     trialData(itrial).condition = trials.condition{itrial};
-    [fp, nm, ext] = fileparts(Input_files{itrial});
+    % % % % % % % % % [fp, nm, ext] = fileparts(Input_files{itrial});
     trialData(itrial).display = upper(nm);
     if strcmp(trialData(itrial).display, 'NULL'); trialData(itrial).display = 'yyy'; end
     trialData(itrial).timeStim = expParams.timeStim(1) + diff(expParams.timeStim).*rand; % time white text is displayed
@@ -634,7 +634,7 @@ for itrial = 1:expParams.ntrials
             % Display the orthography stimulus as normal
             set(annoStr.Stim, 'String', stimread);
             set(annoStr.Stim, 'Visible', 'On');
-        case    'observed')
+        case    'observed'
             % Keep the white fixation cross visible (don't change it)
             % The fixation cross should already be visible from before
             % Just make sure the stimulus text is not shown
@@ -746,7 +746,7 @@ for itrial = 1:expParams.ntrials
         case 'unobserved'
             set(annoStr.Stim, 'String', stimread);
             set(annoStr.Stim, 'Visible', 'On');
-        case    'observed')
+        case    'observed'
             % For observed condition, keep the white fixation cross
             set(annoStr.Plus, 'color','r');  
             set(annoStr.Plus, 'Visible','on');
