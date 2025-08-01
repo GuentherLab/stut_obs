@@ -1,4 +1,4 @@
-function annoStr = setUpVisAnnot_HW(bg)
+function annoStr = setUpVisAnnot_HW(bg, op)
 % Setting up visualization
 % Helper script that sets up a couple of annotation objects that can be used for
 % stimulus visualization / presentation.
@@ -80,6 +80,30 @@ annoStr.Pic = axes(VBFig, 'pos',[1/2-winPos(4)/(4*winPos(3)) 0.25 winPos(4)/(2*w
 axes(annoStr.Pic)
 imshow([])
 drawnow
+
+% Green square GO cue
+% Get screen size for rectangle positioning
+% % % % % % % % % % % % % % % % % % % % % % % % screenSize = get(0, 'ScreenSize'); % [left bottom width height]
+% % % % % % % % % % % % % % % % % % % % % % % % rectWidth = screenSize(3) * expParams.rectWidthProp;
+% % % % % % % % % % % % % % % % % % % % % % % % rectHeight = screenSize(4) * expParams.rectHeightProp;
+% % % % % % % % % % % % % % % % % % % % % % % % rectX = (screenSize(3) - rectWidth) / 2;  % center horizontally
+% % % % % % % % % % % % % % % % % % % % % % % % rectY = (screenSize(4) - rectHeight) / 2; % center vertically
+
+% Create rectangle (initially invisible)
+% % % % % % % annoStr.GoRect = rectangle('Position', [0.5, 0.7, 0.6, 0.3], ...
+% % % % % % %                           'FaceColor', [0 1 0], ...
+% % % % % % %                           'EdgeColor', 'none', ...
+% % % % % % %                           'Visible', 'off');
+
+% Calculate position and size based on proportion variables
+rectX = (1 - op.rectWidthProp) / 2;     % center horizontally
+rectY = (1 - op.rectHeightProp) / 2;    % center vertically
+
+% Create rectangle using the calculated proportions
+annoStr.GoRect = annotation(VBFig, 'rectangle', [rectX, rectY, op.rectWidthProp, op.rectHeightProp], ...
+                           'FaceColor', op.rectColor, ...
+                           'EdgeColor', 'none', ...
+                           'Visible', 'off');
 
 
 end

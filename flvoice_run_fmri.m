@@ -7,6 +7,7 @@ CMRR = true;
 system(sprintf('wmic process where processid=%d call setpriority "high priority"', feature('getpid')));
 
 beepoffset = 0.100;
+num_run_digits = 2; % number of digits to include in run number labels in filenames
 
 % FLVOICE_RUN runs audio recording&scanning session
 % [task]: 'train' or 'test'
@@ -142,11 +143,11 @@ else % if no preset config file defined
         'textpath', fullfile(pwd, 'stimuli', 'text'), ...
         'subject','sub-example',...
         'session', 1, ...
-        'run', 3,...
+        'run', 1,...
         'task', 'test', ...
         'scan', true, ...
         'gender', 'unspecified', ...
-        'repetitions_per_word_per_block', 2, ...
+        'repetitions_per_qa_per_block', 2, ...
         'shuffle_within_block', true, ...
         'timeStim', [2 2.5],...
         'timePostOnset', 3.5,...
@@ -165,7 +166,6 @@ else % if no preset config file defined
         'deviceMic','',...
         'deviceHead','', ...
         'deviceScan','', ...
-        'condition', 'unobserved', ...     % 'observed' or 'unobserved'
         'rectWidthProp', 0.8, ...      % rectangle width as proportion of screen width
         'rectHeightProp', 0.6, ...     % rectangle height as proportion of screen height  
         'rectColor', [0 1 0] ...      % RGB color of rectangle [R G B] (0-1 scale)
@@ -173,6 +173,7 @@ else % if no preset config file defined
 end
 
 expParams.computer = host;
+expParams.runstring = sprintf(['%0',num2str(num_run_digits),'d'], expParams.run); % add zero padding
 
 for n=1:2:numel(varargin)-1, 
     assert(isfield(expParams,varargin{n}),'unrecognized option %s',varargin{n});
@@ -296,20 +297,10 @@ for n=1:numel(out_dropbox)
 end
 
 % visual setup
-annoStr = setUpVisAnnot_HW([0 0 0]);
-
-% Get screen size for rectangle positioning
-screenSize = get(0, 'ScreenSize'); % [left bottom width height]
-rectWidth = screenSize(3) * expParams.rectWidthProp;
-rectHeight = screenSize(4) * expParams.rectHeightProp;
-rectX = (screenSize(3) - rectWidth) / 2;  % center horizontally
-rectY = (screenSize(4) - rectHeight) / 2; % center vertically
-
-% Create rectangle (initially invisible)
-annoStr.GoRect = rectangle('Position', [rectX, rectY, rectWidth, rectHeight], ...
-                          'FaceColor', expParams.rectColor, ...
-                          'EdgeColor', 'none', ...
-                          'Visible', 'off');
+anno_op.rectWidthProp = expParams.rectWidthProp;
+anno_op.rectHeightProp = expParams.rectHeightProp;
+anno_op.rectColor = expParams.rectColor; 
+annoStr = setUpVisAnnot_HW([0 0 0], anno_op);
 
 CLOCKp = ManageTime('start');
 TIME_PREPARE = 0.5; % Waiting period before experiment begin (sec)
@@ -318,11 +309,9 @@ set(annoStr.Stim, 'Visible','on');
 
 % root path is where the subject description files are
 filepath = fullfile(expParams.root, sprintf('sub-%s',expParams.subject), sprintf('ses-%d',expParams.session), expParams.task);
-unique_answers_file  = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%d_task-%s_qa-list.tsv',expParams.subject, expParams.session, expParams.run, expParams.task));
-% % % % % % Input_condname  = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%d_task-%s_desc-conditions.tsv',expParams.subject, expParams.session, expParams.run, expParams.task));
-Output_name = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%d_task-%s_desc-presentation.mat',expParams.subject, expParams.session, expParams.run, expParams.task));
-% % % % % % % % % % % % % % % % % % % % % % % % % % % % assert(~isempty(dir(Input_textname)), 'unable to find input file %s',Input_textname);
-if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite', questdlg(sprintf('This subject %s already has an data file for this ses-%d_run-%d (task: %s), do you want to over-write?', expParams.subject, expParams.session, expParams.run, expParams.task),'Answer', 'Yes - overwrite', 'No - quit','No - quit')), return; end
+unique_answers_file  = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_qa-list.tsv',expParams.subject, expParams.session, expParams.runstring, expParams.task));
+Output_name = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_desc-presentation.mat',expParams.subject, expParams.session, expParams.runstring, expParams.task));
+if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite', questdlg(sprintf('This subject %s already has an data file for this ses-%d_run-%s (task: %s), do you want to over-write?', expParams.subject, expParams.session, expParams.runstring, expParams.task),'Answer', 'Yes - overwrite', 'No - quit','No - quit')), return; end
 
 % read text files and condition labels
 % % % % % % % % % % % % % % % % % Input_files=regexp(fileread(Input_textname),'[\n\r]+','split');
@@ -330,18 +319,22 @@ if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite', questdlg(sprintf('Thi
 expParams.condition_blocks = {'observed';'unobserved';'unobserved';'observed'}; % move these params to json config
 expParams.nblocks = length(expParams.condition_blocks); 
 unique_qa = readtable(unique_answers_file,'FileType','text');
-expParams.ntrials = expParams.nblocks * expParams.repetitions_per_word_per_block;
+n_unique_qa = height(unique_qa); 
+expParams.ntrials_per_block = n_unique_qa * expParams.repetitions_per_qa_per_block; 
+expParams.ntrials = expParams.nblocks * expParams.ntrials_per_block;
 celcol = cell(expParams.ntrials,1); 
-trials = table(1:expParams.ntrials, celcol,celcol, repelem(expParams.condition_blocks,expParams.nblocks,1), 'VariableNames',...
+trials = table([1:expParams.ntrials]', celcol,celcol, repelem(expParams.condition_blocks, expParams.ntrials_per_block, 1), 'VariableNames',...
                 {'trialnum',    'question','answer', 'condition'} );
+
+
 for iblock = 1:expParams.nblocks
-    blockinds = 1 + expParams.repetitions_per_word_per_block*[iblock-1]  : expParams.repetitions_per_word_per_block*iblock; % trialinds within this block
-    block_trials_qa = repmat(unique_qa, op.repetitions_per_word_per_block, 1); % copy each word expParams.repetitions_per_word_per_block times
+    blockinds = 1 + expParams.ntrials_per_block*[iblock-1]  : expParams.ntrials_per_block*iblock; % trialinds within this block
+    block_trials_qa = repmat(unique_qa, expParams.repetitions_per_qa_per_block, 1); % copy each word expParams.repetitions_per_qa_per_block times
     if expParams.shuffle_within_block
         block_trials_qa = block_trials_qa(randperm(height(block_trials_qa)), :); % shuffle within block
     end
-    trials{blockinds,{'question','answer'}} = block_trials_qa; % fill into trials for this block
-    trials.condition(blockinds) = expParams.condition_blocks{iblock}; 
+    trials(blockinds,{'question','answer'}) = block_trials_qa(:,{'question','answer'}); % fill into trials for this block
+    % % % % % % % % % % % % trials.condition(blockinds) = expParams.condition_blocks{iblock}; 
 end
 
 % % % % % % % % % % % % % % % % % Input_files_temp=Input_files(cellfun('length',Input_files)>0);
@@ -361,7 +354,7 @@ end
 
 % % % % % % % % % % % % % % % % stimreads=cell(size(Input_files));
 % % % % % % % % % % % % % % % % stimreads(NoNull) = cellfun(@(x)fileread(x),Input_files(NoNull),'uni',0);
-% % % % % % % % % % % % % % % % sileread = dsp.AudioFileReader(fullfile(expParams.textpath, 'silent.wav'), 'SamplesPerFrame', 2048);
+sileread = dsp.AudioFileReader(fullfile(expParams.textpath, 'silent.wav'), 'SamplesPerFrame', 2048);
 
 % % % % % % % if isempty(dir(Input_condname))
 % % % % % % %     [nill,Input_conditions]=arrayfun(@fileparts,Input_files,'uni',0);
@@ -370,7 +363,7 @@ end
 % % % % % % %     Input_conditions=Input_conditions(cellfun('length',Input_conditions)>0);
 % % % % % % %     assert(numel(Input_files)==numel(Input_conditions),'unequal number of lines/trials in %s (%d) and %s (%d)',unique_answers_file, numel(Input_files), Input_condname, numel(Input_conditions));
 % % % % % % % end
-% % % % % % % expParams.numTrials = length(Input_conditions); % pull out the number of trials from the stimList
+% % % % % % % expParams.ntrials = length(Input_conditions); % pull out the number of trials from the stimList
 
 % create random number stream so randperm doesn't call the same thing everytime when matlab is opened
 s = RandStream.create('mt19937ar','seed',sum(100*clock));
@@ -552,15 +545,15 @@ intvs = [];
 %% LOOP OVER TRIALS
 for itrial = 1:expParams.ntrials
 
-    fprintf('\nRun %d, trial %d/%d\n', expParams.run, itrial, expParams.ntrials);
+    fprintf('\nRun %s, trial %d/%d\n', expParams.runstring, itrial, expParams.ntrials);
     set(annoStr.Plus, 'Visible','on');
 
     % trial specific timing parameters with jitter on
     trialData(itrial).question = trials.question{itrial};
     trialData(itrial).condition = trials.condition{itrial};
-    % % % % % % % % % [fp, nm, ext] = fileparts(Input_files{itrial});
-    trialData(itrial).display = upper(nm);
-    if strcmp(trialData(itrial).display, 'NULL'); trialData(itrial).display = 'yyy'; end
+    if strcmp(trials.question{itrial}, 'NULL'); 
+        trialData(itrial).display = 'yyy'; 
+    end
     trialData(itrial).timeStim = expParams.timeStim(1) + diff(expParams.timeStim).*rand; % time white text is displayed
     trialData(itrial).timePostOnset = expParams.timePostOnset(1) + diff(expParams.timePostOnset).*rand; % time after voice onset we record
     trialData(itrial).timePreStim = expParams.timePreStim(1) + diff(expParams.timePreStim).*rand; % time before the next stimulus is presented
@@ -573,15 +566,15 @@ for itrial = 1:expParams.ntrials
 
     % print current and upcoming stimulus questions on command line for the investigator to read
     % print trial number and total trials
-    if itrial ~= expParams.numTrials % if not last trial
-        next_trial_string = ['\n      Next trials question/word will be:\n ''', trials.question{itrial+1}, ''' /// ''', trials_words.word{itrial+1}, ''''];
-    elseif itrial == expParams.numTrials % if last trial
+    if itrial ~= expParams.ntrials % if not last trial
+        next_trial_string = ['\n      Next trials question/answer will be:\n ''', trials.question{itrial+1}, ''' /// ''', trials.answer{itrial+1}, ''''];
+    elseif itrial == expParams.ntrials % if last trial
         next_trial_string = '';
     end
     fprintf([...
         '\nThis trial''s stimulus question: ''', trials.question{itrial}, '''', ...
-        '\n      Answer = ''',trials.word{itrial}, '''',...
-        '\n      ........ Trial ', num2str(itrial), '/' num2str(expParams.numTrials), ', Run ', num2str(expParams.run), ...
+        '\n      Answer = ''',trials.answer{itrial}, '''',...
+        '\n      ........ Trial ', num2str(itrial), '/' num2str(expParams.ntrials), ', Run ', num2str(expParams.runstring), ...
         next_trial_string,...
         '\n      As you finish asking this trial''s question, please press Spacebar to start the anticipation period',...
         '\n']);
@@ -609,7 +602,7 @@ for itrial = 1:expParams.ntrials
         
     % set up figure for real-time plotting of audio signal of next trial
     figure(rtfig);
-    set(micTitle,'string',sprintf('%s %s run %d trial %d condition: %s', expParams.subject, expParams.task, expParams.run, itrial, trialData(itrial).condition));
+    set(micTitle,'string',sprintf('%s %s run %s trial %d condition: %s', expParams.subject, expParams.task, expParams.runstring, itrial, trialData(itrial).condition));
     setup(deviceReader) % note: moved this here to avoid delays in time-sensitive portion
 
     if isempty(CLOCK)
@@ -629,7 +622,7 @@ for itrial = 1:expParams.ntrials
     set(annoStr.Stim, 'color', 'w');
     
     % Check condition to determine what to display
-    switch trials.condition
+    switch trials.condition{itrial}
         case 'unobserved'
             % Display the orthography stimulus as normal
             set(annoStr.Stim, 'String', stimread);
@@ -659,6 +652,7 @@ for itrial = 1:expParams.ntrials
     ok=ManageTime('wait', CLOCK, TIME_GOSIGNAL_START);     % waits for GO signal time
     % GO signal goes with beep
     while ~isDone(beepread); sound=beepread();headwrite(sound);end;reset(beepread);reset(headwrite);
+    set(annoStr.Plus, 'Visible','off'); % remove fixcross
     set(annoStr.GoRect, 'Visible', 'on');  % <-- SHOW GREEN RECTANGLE
 
     TIME_GOSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK); % actual time for GO signal 
@@ -742,7 +736,7 @@ for itrial = 1:expParams.ntrials
 
     % For observed condition, the fixation cross was never turned off
     % For unobserved condition, show the red fixation cross as normal
-    switch expParams.condition
+    switch trials.condition{itrial}
         case 'unobserved'
             set(annoStr.Stim, 'String', stimread);
             set(annoStr.Stim, 'Visible', 'On');
@@ -813,7 +807,7 @@ for itrial = 1:expParams.ntrials
 
     % fName_trial will be used for individual trial files (which will
     % live in the run folder)
-    fName_trial = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%d_task-%s_trial-%d.mat',expParams.subject, expParams.session, expParams.run, expParams.task,itrial));
+    fName_trial = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_trial-%d.mat',expParams.subject, expParams.session, expParams.runstring, expParams.task,itrial));
     save(fName_trial,'tData');
 end
 
