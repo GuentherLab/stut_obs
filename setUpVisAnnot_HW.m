@@ -134,11 +134,6 @@ function anoPos = getPos(anoD, winPos)
 end
 
 
-
-
-
-
-
 % Helper function to set text with automatic wrapping
 function setWrappedText(textObj, textStr)
     % Simple text wrapping function
