@@ -121,17 +121,17 @@ annoStr.setWrappedText = @(textStr) setWrappedText(annoStr.Stim, textStr);
 
 end
 
-% % % % % % % % % % % % % Function to determine annotation position
-% % % % % % % % % % % % function anoPos = getPos(anoD, winPos)
-% % % % % % % % % % % % 
-% % % % % % % % % % % % 
-% % % % % % % % % % % %     anoW = round(anoD(1)/winPos(3), 2);
-% % % % % % % % % % % %     anoH = round(anoD(2)/winPos(4), 2);
-% % % % % % % % % % % %     anoX = 0.2 - anoW/2; %%% shift left.... to center instead, use 0.5 - anoW/2
-% % % % % % % % % % % %     anoY = 0.5 - anoH/2;
-% % % % % % % % % % % %     anoPos = [anoX anoY anoW anoH];
-% % % % % % % % % % % % 
-% % % % % % % % % % % % end
+% Function to determine annotation position
+function anoPos = getPos(anoD, winPos)
+
+
+    anoW = round(anoD(1)/winPos(3), 2);
+    anoH = round(anoD(2)/winPos(4), 2);
+    anoX = 0.2 - anoW/2; %%% shift left.... to center instead, use 0.5 - anoW/2
+    anoY = 0.5 - anoH/2;
+    anoPos = [anoX anoY anoW anoH];
+
+end
 
 
 

@@ -164,6 +164,8 @@ else % if no preset config file defined
 end
 
 expParams.computer = host;
+expParams.rectWidthProp = 0.4; 
+expParams.rectHeightProp = 0.6; 
 
 for n=1:2:numel(varargin)-1, 
     assert(isfield(expParams,varargin{n}),'unrecognized option %s',varargin{n});
@@ -271,7 +273,7 @@ for n=1:numel(out_dropbox)
 end
 
 % visual setup
-annoStr = setUpVisAnnot_HW([0 0 0]);
+annoStr = setUpVisAnnot_HW([0 0 0], expParams);
 
 CLOCKp = ManageTime('start');
 TIME_PREPARE = 0.5; % Waiting period before experiment begin (sec)
