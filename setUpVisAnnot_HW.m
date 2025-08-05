@@ -14,17 +14,27 @@ monitorSize = get(0, 'Monitor');
 numMon = size(monitorSize, 1);
 
 if numMon == 2
-    figPosition = [monitorSize(2,1) monitorSize(2,2) monitorSize(2,3) monitorSize(2,4)];
+    % For dual monitor, still use second monitor but only right half
+    W = monitorSize(2,3);
+    H = monitorSize(2,4);
+    XPos = monitorSize(2,1) + W/2;  % Start at middle of second monitor
+    YPos = monitorSize(2,2);
+    figPosition = [XPos YPos W/2 H];  % Right half width, full height
 else
+    % For single monitor, use right half
     W = monitorSize(1, 3);
     H = monitorSize(1, 4);
-    W2 = W/2;
-    H2 = H/2;
-    XPos = W2;
-    YPos = 50;
-    figPosition = [XPos YPos W2 H2];
+    XPos = W/2;  % Start at middle of screen
+    YPos = 0;    % Start at bottom
+    figPosition = [XPos YPos W/2 H];  % Right half width, full height
 end
+
 winPos = figPosition;
+
+
+
+
+
 
 %% Preparing 'Ready' Annotation Position
 rdAnoD = [0.7 0.3];
@@ -36,7 +46,7 @@ cuAnoPos = getPos(cuAnoD, winPos);
 % cuAnoPos = [0.35 0.10 0.25 0.25];
 
 % Preparing 'Stim' Annotation Position
-stimAnoD = [0.50 0.50]; % if stim too small/large, need to adjust
+stimAnoD = [0.30 0.50]; % if stim too small/large, need to adjust
 stimAnoPos = getPos(stimAnoD, winPos);
 
 %% Actually create the stim presentation figure
@@ -106,19 +116,66 @@ annoStr.GoRect = annotation(VBFig, 'rectangle', [rectX, rectY, op.rectWidthProp,
                            'Visible', 'off');
 
 
-end
-
-% Function to determine annotation position
-function anoPos = getPos(anoD, winPos)
-    
-    
-    anoW = round(anoD(1)/winPos(3), 2);
-    anoH = round(anoD(2)/winPos(4), 2);
-    anoX = 0.5 - anoW/2;
-    anoY = 0.5 - anoH/2;
-    anoPos = [anoX anoY anoW anoH];
+% Add a helper function for setting wrapped text
+annoStr.setWrappedText = @(textStr) setWrappedText(annoStr.Stim, textStr);
 
 end
+
+% % % % % % % % % % % % % Function to determine annotation position
+% % % % % % % % % % % % function anoPos = getPos(anoD, winPos)
+% % % % % % % % % % % % 
+% % % % % % % % % % % % 
+% % % % % % % % % % % %     anoW = round(anoD(1)/winPos(3), 2);
+% % % % % % % % % % % %     anoH = round(anoD(2)/winPos(4), 2);
+% % % % % % % % % % % %     anoX = 0.2 - anoW/2; %%% shift left.... to center instead, use 0.5 - anoW/2
+% % % % % % % % % % % %     anoY = 0.5 - anoH/2;
+% % % % % % % % % % % %     anoPos = [anoX anoY anoW anoH];
+% % % % % % % % % % % % 
+% % % % % % % % % % % % end
+
+
+
+
+
+
+
+% Helper function to set text with automatic wrapping
+function setWrappedText(textObj, textStr)
+    % Simple text wrapping function
+    maxCharsPerLine = 60; % Adjust based on font size and box width
+    
+    if length(textStr) <= maxCharsPerLine
+        set(textObj, 'String', textStr);
+        return;
+    end
+    
+    % Split long text into lines
+    words = strsplit(textStr, ' ');
+    lines = {};
+    currentLine = '';
+    
+    for i = 1:length(words)
+        testLine = [currentLine, words{i}, ' '];
+        if length(testLine) > maxCharsPerLine && ~isempty(currentLine)
+            lines{end+1} = strtrim(currentLine);
+            currentLine = [words{i}, ' '];
+        else
+            currentLine = testLine;
+        end
+    end
+    
+    if ~isempty(currentLine)
+        lines{end+1} = strtrim(currentLine);
+    end
+    
+    % Set the wrapped text
+    set(textObj, 'String', lines);
+end
+
+
+
+
+
 
 %% Commands to use within the main script / trial
 % Use the following to set up the visual annotations and

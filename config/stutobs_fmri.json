@@ -27,7 +27,7 @@
     "deviceMic": "",
     "deviceHead": "",
     "deviceScan": "",
-    "rectWidthProp": 0.7,
-    "rectHeightProp": 0.7,
+    "rectWidthProp": 0.4,
+    "rectHeightProp": 0.4,
     "rectColor": [0 .8 0] 
 }

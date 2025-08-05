@@ -316,7 +316,9 @@ if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite', questdlg(sprintf('Thi
 % read text files and condition labels
 % % % % % % % % % % % % % % % % % Input_files=regexp(fileread(Input_textname),'[\n\r]+','split');
 
-expParams.condition_blocks = {'observed';'unobserved';'unobserved';'observed'}; % move these params to json config
+% expParams.condition_blocks = {'observed';'unobserved';'unobserved';'observed'}; % move these params to json config
+expParams.condition_blocks = {'unobserved';'observed';'observed';'unobserved'}; % move these params to json config
+
 expParams.nblocks = length(expParams.condition_blocks); 
 unique_qa = readtable(unique_answers_file,'FileType','text');
 n_unique_qa = height(unique_qa); 
@@ -337,20 +339,7 @@ for iblock = 1:expParams.nblocks
     % % % % % % % % % % % % trials.condition(blockinds) = expParams.condition_blocks{iblock}; 
 end
 
-% % % % % % % % % % % % % % % % % Input_files_temp=Input_files(cellfun('length',Input_files)>0);
-% % % % % % % % % % % % % % % % % NoNull = find(~strcmp(Input_files_temp, 'NULL'));
-% % % % % % % % % % % % % % % % % 
-% % % % % % % % % % % % % % % % % if ispc
-% % % % % % % % % % % % % % % % %     Input_files=arrayfun(@(x)fullfile(expParams.textpath, expParams.task, strcat(strrep(x, '/', '\'), '.tsv')), Input_files_temp);
-% % % % % % % % % % % % % % % % % else
-% % % % % % % % % % % % % % % % %     Input_files=arrayfun(@(x)fullfile(expParams.textpath, expParams.task, strcat(x, '.tsv')), Input_files_temp);
-% % % % % % % % % % % % % % % % % end
 
-
-% % % % % % % % % % % % % % % % % ok=cellfun(@(x)exist(x,'file'), Input_files(NoNull));
-% % % % % % % % % % % % % % % % % assert(all(ok), 'unable to find files %s', sprintf('%s ',Input_files{NoNull(~ok)}));
-% % % % % % % % % % % % % % % % % dirFiles=cellfun(@dir, Input_files(NoNull), 'uni', 0);
-% % % % % % % % % % % % % % % % % NoNull=NoNull(cellfun(@(x)x.bytes>0, dirFiles));
 
 % % % % % % % % % % % % % % % % stimreads=cell(size(Input_files));
 % % % % % % % % % % % % % % % % stimreads(NoNull) = cellfun(@(x)fileread(x),Input_files(NoNull),'uni',0);
@@ -653,6 +642,7 @@ for itrial = 1:expParams.ntrials
     % GO signal goes with beep
     while ~isDone(beepread); sound=beepread();headwrite(sound);end;reset(beepread);reset(headwrite);
     set(annoStr.Plus, 'Visible','off'); % remove fixcross
+    set(annoStr.Stim, 'Visible','off'); % remove stim question orthography if it's there (unobserved condition)
     set(annoStr.GoRect, 'Visible', 'on');  % <-- SHOW GREEN RECTANGLE
 
     TIME_GOSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK); % actual time for GO signal 
@@ -945,6 +935,4 @@ end
 end
 
         
-
-
 
