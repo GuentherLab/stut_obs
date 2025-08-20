@@ -146,6 +146,7 @@ else % if no preset config file defined
         'gender', 'unspecified', ...
         'repetitions_per_qa_per_block', 2, ...
         'shuffle_within_block', true, ...
+        'show_question_orthography', false, ...
         'timeStim', [2 2.5],...
         'timePostOnset', 3.5,...
         'timePreStim', 0.5,...
@@ -169,6 +170,9 @@ else % if no preset config file defined
         );
 end
 
+% expParams.condition_blocks = {'observed';'unobserved';'unobserved';'observed'}; % move these params to json config
+expParams.condition_blocks = {'unobserved';'observed';'observed';'unobserved'}; % move these params to json config
+
 expParams.computer = host;
 expParams.runstring = sprintf(['%0',num2str(num_run_digits),'d'], expParams.run); % add zero padding
 
@@ -183,8 +187,8 @@ try, a=audioDeviceWriter('Device','asdf'); catch me; str=regexp(regexprep(me.mes
 % set audio input, stim output, and trigger devices
 switch host
     case '677-GUE-WL-0010' % AM work laptop
-        ipind = find(contains(strINPUT, 'Analogue')&contains(strINPUT, 'Default'));
-        ipind = find(contains(strOUTPUT, 'Analogue')&contains(strOUTPUT, 'Default'));
+        ipind = find(contains(strINPUT, 'Default'));
+        opind = find(contains(strOUTPUT, 'Default'));
         
     otherwise % assume we're connected to a usable focusfrite
         % get focusrite device input number
@@ -282,7 +286,7 @@ if ~ok, return; end
 expParams.deviceMic=strINPUT{get(ht3a,'value')};
 expParams.deviceHead=strOUTPUT{get(ht3b,'value')};
 
-if expParams.scan % skip this assigmnet if we're not scanning; if focusrite is not connected, it generate error here
+if expParams.scan % skip this assignment if we're not scanning; if focusrite is not connected, it generate error here
     expParams.deviceScan=strOUTPUT{get(ht3c,'value')};
 end
 delete(thfig);
@@ -327,8 +331,7 @@ if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite', questdlg(sprintf('Thi
 % read text files and condition labels
 % % % % % % % % % % % % % % % % % Input_files=regexp(fileread(Input_textname),'[\n\r]+','split');
 
-% expParams.condition_blocks = {'observed';'unobserved';'unobserved';'observed'}; % move these params to json config
-expParams.condition_blocks = {'unobserved';'observed';'observed';'unobserved'}; % move these params to json config
+
 
 expParams.nblocks = length(expParams.condition_blocks); 
 unique_qa = readtable(unique_answers_file,'FileType','text');
@@ -622,19 +625,28 @@ for itrial = 1:expParams.ntrials
     set(annoStr.Stim, 'color', 'w');
     
     % Check condition to determine what to display
+
+
+    if expParams.show_question_orthography
+        % Display the orthography stimulus as normal
+        set(annoStr.Stim, 'String', stimread);
+        set(annoStr.Stim, 'Visible', 'On');
+    elseif ~show_question_orthography
+        % Keep the white fixation cross visible (don't change it)
+        % The fixation cross should already be visible from before
+        % Just make sure the stimulus text is not shown
+        set(annoStr.Stim, 'Visible', 'Off');
+        % Keep the Plus (fixation cross) visible
+        set(annoStr.Plus, 'Visible', 'on');
+        set(annoStr.Plus, 'color', 'w');  % ensure it's white
+    end
+
+
     switch trials.condition{itrial}
         case 'unobserved'
-            % Display the orthography stimulus as normal
-            set(annoStr.Stim, 'String', stimread);
-            set(annoStr.Stim, 'Visible', 'On');
+
         case    'observed'
-            % Keep the white fixation cross visible (don't change it)
-            % The fixation cross should already be visible from before
-            % Just make sure the stimulus text is not shown
-            set(annoStr.Stim, 'Visible', 'Off');
-            % Keep the Plus (fixation cross) visible
-            set(annoStr.Plus, 'Visible', 'on');
-            set(annoStr.Plus, 'color', 'w');  % ensure it's white
+
         otherwise 
             error('unrecognized behavioral task condition')
     end
