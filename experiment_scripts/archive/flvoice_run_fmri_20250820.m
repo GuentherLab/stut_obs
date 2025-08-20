@@ -84,10 +84,7 @@ num_run_digits = 2; % number of digits to include in run number labels in filena
 % change expParams to be stored values.
 
 ET = tic;
-if ispc, [nill,host]=system('hostname');
-else [nill,host]=system('hostname -f');
-end
-host=regexprep(host,'\n','');
+[dirs, host] = set_paths_stut_obs(); % set project paths and get computer name
 
 if strcmp(host, '677-GUE-WL-0009')
     default_fontsize = 10;
@@ -183,10 +180,19 @@ end
 try, a=audioDeviceReader('Device','asdf'); catch me; str=regexp(regexprep(me.message,'.*Valid values are:',''),'"([^"]*)"','tokens'); strINPUT=[str{:}]; end;
 try, a=audioDeviceWriter('Device','asdf'); catch me; str=regexp(regexprep(me.message,'.*Valid values are:',''),'"([^"]*)"','tokens'); strOUTPUT=[str{:}]; end;
 
-% get focusrite device input number
-ipind = find(contains(strINPUT, 'Analogue')&contains(strINPUT, 'Focusrite'));
-% get focusrite device output number
-opind = find(contains(strOUTPUT, 'Speakers')&contains(strOUTPUT, 'Focusrite'));
+% set audio input, stim output, and trigger devices
+switch host
+    case '677-GUE-WL-0010' % AM work laptop
+        
+    otherwise % assume we're connected to a usable focusfrite
+    % get focusrite device input number
+    ipind = find(contains(strINPUT, 'Analogue')&contains(strINPUT, 'Focusrite'));
+    % get focusrite device output number
+    opind = find(contains(strOUTPUT, 'Speakers')&contains(strOUTPUT, 'Focusrite'));
+end
+
+
+
 % get trigger device number
 tgind = find(contains(strOUTPUT, 'Playback')&contains(strOUTPUT, 'Focusrite'));
 
