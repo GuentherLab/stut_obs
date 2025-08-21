@@ -10,19 +10,8 @@ beepoffset = 0.100;
 num_run_digits = 2; % number of digits to include in run number labels in filenames
 
 % FLVOICE_RUN runs audio recording&scanning session
-% [task]: 'train' or 'test'
+% [task]: 'jackson20'
 % 
-% INPUT:
-%    [root]/sub-[subject]/ses-[session]/beh/[task]/sub-[subject]_ses-[session]_run-[run]_task-[task]_desc-stimulus.tsv     : INPUT list of stimulus NAMES W/O suffix (one trial per line; enter the string NULL or empty audiofiles for NULL -no speech- conditions)
-%    [root]/sub-[subject]/ses-[session]/beh/[task]/sub-[subject]_ses-[session]_run-[run]_task-[task]_desc-conditions.tsv   : (optional) INPUT list of condition labels (one trial per line)
-%                                                                                                                     if unspecified, condition labels are set to stimulus filename
-%    [textpath]/[task]/                        : path for text stimulus files (.tsv)
-%    [figurespath]/                            : path for image stimulus files (.png) [if any]
-%    The above should match names in stimulus.tsv
-%
-% OUTPUT:
-%    [root]/sub-[subject]/ses-[session]/beh/[task]/sub-[subject]_ses-[session]_run-[run]_task-[task]_desc-audio.mat        : OUTPUT audio data (see FLVOICE_IMPORT for format details) 
-%
 % AUDIO RECORDING&SCANNING SEQUENCE: (repeat for each trial)
 %
 % |                                                  |------ RECORDING -------------------------------------|          
@@ -55,7 +44,7 @@ num_run_digits = 2; % number of digits to include in run number labels in filena
 %       subject                     : subject ID ['TEST01']
 %       session                     : session number [1]
 %       run                         : run number [1]
-%       task                        : task name ['test']
+%       task                        : task name ['jackson20']
 %       gender                      : subject gender ['unspecified']
 %       scan                        : true/false include scanning segment in experiment sequence [1] 
 %       timePostStim                : time (s) from end of the text stimulus presentation to the GO signal (D1 in schematic above) (one value for fixed time, two values for minimum-maximum range of random times) [.25 .75] 
@@ -141,10 +130,10 @@ else % if no preset config file defined
         'subject','sub-example',...
         'session', 1, ...
         'run', 1,...
-        'task', 'test', ...
+        'task', 'jackson20', ...
         'scan', true, ...
         'gender', 'unspecified', ...
-        'repetitions_per_qa_per_block', 2, ...
+        'repetitions_per_qa_per_block', 1, ...
         'shuffle_within_block', true, ...
         'show_question_orthography', false, ...
         'timeStim', [2 2.5],...
@@ -170,8 +159,8 @@ else % if no preset config file defined
         );
 end
 
-% expParams.condition_blocks = {'observed';'unobserved';'unobserved';'observed'}; % move these params to json config
-expParams.condition_blocks = {'unobserved';'observed';'observed';'unobserved'}; % move these params to json config
+
+
 
 expParams.computer = host;
 expParams.runstring = sprintf(['%0',num2str(num_run_digits),'d'], expParams.run); % add zero padding
@@ -206,7 +195,7 @@ strVisual={'orthography'};
 
 % GUI for user to modify options
 fnames=fieldnames(expParams);
-fnames=fnames(~ismember(fnames,{'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender', 'scan', 'deviceMic','deviceHead','deviceScan'}));
+fnames=fnames(~ismember(fnames,{'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender','repetitions_per_qa_per_block','shuffle_within_block','show_question_orthography', 'scan', 'deviceMic','deviceHead','deviceScan'}));
 for n=1:numel(fnames)
     val=expParams.(fnames{n});
     if ischar(val), fvals{n}=val;
@@ -214,6 +203,13 @@ for n=1:numel(fnames)
     else fvals{n}=mat2str(val);
     end
 end
+
+% expParams.condition_blocks = {'observed';'unobserved';'unobserved';'observed'}; % move these params to json config
+% expParams.condition_blocks = {'unobserved';'observed';'observed';'unobserved'}; % move these params to json config
+% expParams.condition_blocks = {'unobserved'}; 
+% expParams.condition_blocks = {'observed';'observed';'observed'};
+expParams.condition_blocks = {'unobserved';'unobserved';'unobserved'};
+% expParams.condition_blocks = {'observed'}
 
 out_dropbox = {'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender', 'scan'};
 for n=1:numel(out_dropbox)
@@ -323,7 +319,8 @@ set(annoStr.Stim, 'String', 'Preparing...');
 set(annoStr.Stim, 'Visible','on');
 
 % root path is where the subject description files are
-filepath = fullfile(expParams.root, sprintf('sub-%s',expParams.subject), sprintf('ses-%d',expParams.session), expParams.task);
+filepath = [expParams.root, filesep, sprintf('sub-%s',expParams.subject), filesep, sprintf('ses-%d',expParams.session),...
+    filesep, 'beh', filesep, expParams.task);
 unique_answers_file  = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_qa-list.tsv',expParams.subject, expParams.session, expParams.runstring, expParams.task));
 Output_name = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_desc-presentation.mat',expParams.subject, expParams.session, expParams.runstring, expParams.task));
 if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite', questdlg(sprintf('This subject %s already has an data file for this ses-%d_run-%s (task: %s), do you want to over-write?', expParams.subject, expParams.session, expParams.runstring, expParams.task),'Answer', 'Yes - overwrite', 'No - quit','No - quit')), return; end
@@ -349,7 +346,7 @@ for iblock = 1:expParams.nblocks
     if expParams.shuffle_within_block
         block_trials_qa = block_trials_qa(randperm(height(block_trials_qa)), :); % shuffle within block
     end
-    trials(blockinds,{'question','answer'}) = block_trials_qa(:,{'question','answer'}); % fill into trials for this block
+    trials(blockinds,{'question','answer','stimfile'}) = block_trials_qa(:,{'question','answer','stimfile'}); % fill into trials for this block
     % % % % % % % % % % % % trials.condition(blockinds) = expParams.condition_blocks{iblock}; 
 end
 
@@ -631,7 +628,7 @@ for itrial = 1:expParams.ntrials
         % Display the orthography stimulus as normal
         set(annoStr.Stim, 'String', stimread);
         set(annoStr.Stim, 'Visible', 'On');
-    elseif ~show_question_orthography
+    elseif ~expParams.show_question_orthography
         % Keep the white fixation cross visible (don't change it)
         % The fixation cross should already be visible from before
         % Just make sure the stimulus text is not shown
@@ -644,7 +641,20 @@ for itrial = 1:expParams.ntrials
 
     switch trials.condition{itrial}
         case 'unobserved'
-
+            % TIME_SOUND_START = TIME_STIM_ACTUALLYSTART + trialData(ii).timePreSound;
+            % ok=ManageTime('wait', CLOCK, TIME_SOUND_START - stimoffset);
+            % ok=ManageTime('wait', CLOCK, TIME_SOUND_START);
+            stim_q_file = [dirs.projrepo, filesep, 'stimuli', filesep,'audio', filesep, trials.stimfile{itrial}, '.mp3']; 
+            [Input_sound, Input_fs] = audioread(stim_q_file); 
+            % stimPlayer = audioplayer(Input_sound,Input_fs, 24, stimID);
+            stimPlayer = audioplayer(Input_sound,Input_fs, 24);
+            play(stimPlayer);
+            % sttInd=1; endMax=size(Input_sound, 1); while sttInd<endMax; headwrite(Input_sound(sttInd:min(sttInd+2047, endMax))); sttInd=sttInd+2048; end; reset(headwrite);
+            TIME_SOUND_ACTUALLYSTART = ManageTime('current', CLOCK);
+            % while ~isDone(stimread); sound=stimread();headwrite(sound);end;release(stimread);reset(headwrite);
+            %%% add code here to display the text files
+            TIME_SOUND_END = TIME_SOUND_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
+            if ~ok, fprintf('i am late for this trial TIME_SOUND_START\n'); end
         case    'observed'
 
         otherwise 
@@ -747,17 +757,17 @@ for itrial = 1:expParams.ntrials
     % % % % % % % % % % % % set(annoStr.Plus, 'color','r');
     % % % % % % % % % % % % set(annoStr.Plus, 'Visible','on');
 
-    % For observed condition, the fixation cross was never turned off
+    % For observed condition, 
     % For unobserved condition, show the red fixation cross as normal
-    switch trials.condition{itrial}
-        case 'unobserved'
+
+
+    if expParams.show_question_orthography
             set(annoStr.Stim, 'String', stimread);
             set(annoStr.Stim, 'Visible', 'On');
-        case    'observed'
+    elseif ~expParams.show_question_orthography % the fixation cross was never turned off
             % For observed condition, keep the white fixation cross
             set(annoStr.Plus, 'color','r');  
             set(annoStr.Plus, 'Visible','on');
-
     end
 
 

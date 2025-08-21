@@ -5,7 +5,7 @@
     "subject": "example",
     "session": 1,
     "run": 1,
-    "task": "stutobs",
+    "task": "jackson20",
     "gender": "unspecified",
     "repetitions_per_qa_per_block": 2,
     "shuffle_within_block": true,
