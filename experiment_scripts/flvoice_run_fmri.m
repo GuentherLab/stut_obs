@@ -159,11 +159,7 @@ else % if no preset config file defined
         );
 end
 
-
-
-
 expParams.computer = host;
-expParams.runstring = sprintf(['%0',num2str(num_run_digits),'d'], expParams.run); % add zero padding
 
 for n=1:2:numel(varargin)-1, 
     assert(isfield(expParams,varargin{n}),'unrecognized option %s',varargin{n});
@@ -306,6 +302,7 @@ for n=1:numel(out_dropbox)
         expParams.(out_dropbox{n})=str2num(val);
     end
 end
+expParams.runstring = sprintf(['%0',num2str(num_run_digits),'d'], expParams.run); % add zero padding
 
 % visual setup
 anno_op.rectWidthProp = expParams.rectWidthProp;
@@ -407,7 +404,7 @@ beepdur = numel(twav)/tfs;
 beepread = dsp.AudioFileReader(fullfile(fileparts(which(mfilename)),'flvoice_run_beep.wav'), 'SamplesPerFrame', 2048);
 headwrite = audioDeviceWriter('SampleRate',beepread.SampleRate,'Device',expParams.deviceHead);
 
-if expParams.scan,
+if expParams.scan
     if ~ismember(expParams.deviceScan, strOUTPUT), expParams.deviceScan=strOUTPUT{find(strncmp(lower(expParams.deviceScan),lower(strOUTPUT),numel(expParams.deviceScan)),1)}; end
     assert(ismember(expParams.deviceScan, strOUTPUT), 'unable to find match to deviceScan name %s',expParams.deviceScan);
     [ok,ID]=ismember(expParams.deviceScan, strOUTPUT);
