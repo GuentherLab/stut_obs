@@ -11,7 +11,7 @@
     "shuffle_within_block": true,
     "show_question_orthography": false,
     "scan": true,
-    "timeStim": [3.0,3.5],
+    "timeStim": [4.0,4.5],
     "timePostOnset": 4,
     "timeScan": 1.6,
     "timePreStim": 0.50,

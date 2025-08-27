@@ -195,7 +195,7 @@ strVisual={'orthography'};
 
 % GUI for user to modify options
 fnames=fieldnames(expParams);
-fnames=fnames(~ismember(fnames,{'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender','repetitions_per_qa_per_block','shuffle_within_block','show_question_orthography', 'scan', 'deviceMic','deviceHead','deviceScan'}));
+% fnames=fnames(~ismember(fnames,{'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender','repetitions_per_qa_per_block','shuffle_within_block','show_question_orthography', 'scan', 'deviceMic','deviceHead','deviceScan'}));
 for n=1:numel(fnames)
     val=expParams.(fnames{n});
     if ischar(val), fvals{n}=val;
@@ -204,11 +204,11 @@ for n=1:numel(fnames)
     end
 end
 
-% expParams.condition_blocks = {'observed';'unobserved';'unobserved';'observed'}; % move these params to json config
+expParams.condition_blocks = {'observed';'unobserved';'observed';'unobserved'}; % move these params to json config
 % expParams.condition_blocks = {'unobserved';'observed';'observed';'unobserved'}; % move these params to json config
 % expParams.condition_blocks = {'unobserved'}; 
 % expParams.condition_blocks = {'observed';'observed';'observed'};
-expParams.condition_blocks = {'unobserved';'unobserved';'unobserved'};
+% expParams.condition_blocks = {'unobserved';'unobserved';'unobserved'};
 % expParams.condition_blocks = {'observed'}
 
 out_dropbox = {'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender', 'scan'};
@@ -320,7 +320,7 @@ set(annoStr.Stim, 'Visible','on');
 
 % root path is where the subject description files are
 filepath = [expParams.root, filesep, sprintf('sub-%s',expParams.subject), filesep, sprintf('ses-%d',expParams.session),...
-    filesep, 'beh', filesep, expParams.task);
+    filesep, 'beh', filesep, expParams.task];
 unique_answers_file  = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_qa-list.tsv',expParams.subject, expParams.session, expParams.runstring, expParams.task));
 Output_name = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_desc-presentation.mat',expParams.subject, expParams.session, expParams.runstring, expParams.task));
 if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite', questdlg(sprintf('This subject %s already has an data file for this ses-%d_run-%s (task: %s), do you want to over-write?', expParams.subject, expParams.session, expParams.runstring, expParams.task),'Answer', 'Yes - overwrite', 'No - quit','No - quit')), return; end

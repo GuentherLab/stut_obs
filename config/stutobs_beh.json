@@ -7,7 +7,7 @@
     "run": 1,
     "task": "jackson20",
     "gender": "unspecified",
-    "repetitions_per_qa_per_block": 2,
+    "repetitions_per_qa_per_block": 1,
     "shuffle_within_block": true,
     "show_question_orthography": false,
     "scan": false,
