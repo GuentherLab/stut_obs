@@ -85,7 +85,8 @@ end
 preFlag = false;
 expRead = {};
 presfig=dialog('units','norm','position',[.3,.3,.3,.1],'windowstyle','normal','name','Load preset parameters','color','w','resize','on');
-uicontrol(presfig,'style','text','units','norm','position',[.05, .475, .6, .35],'string','Select preset exp config file (.json):','backgroundcolor','w','fontsize',default_fontsize-2,'fontweight','bold','horizontalalignment','left');
+uicontrol(presfig,'style','text','units','norm','position',[.05, .475, .6, .35],...
+    'string','Select preset exp config file (.json):','backgroundcolor','w','fontsize',default_fontsize-2,'fontweight','bold','horizontalalignment','left');
 prePath=uicontrol('Style', 'edit','Units','norm','FontUnits','norm','FontSize',0.5,'HorizontalAlignment', 'left','Position',[.55 .55 .3 .3],'Parent',presfig);
 preBrowse=uicontrol('Style', 'pushbutton','String','Browse','Units','norm','FontUnits','norm','FontSize',0.5,'Position',[.85 .55 .15 .3],'Parent',presfig, 'Callback',@preCall1);
 preConti=uicontrol('Style', 'pushbutton','String','Continue','Units','norm','FontUnits','norm','FontSize',0.5,'Position',[.3 .12 .15 .3],'Parent',presfig, 'Callback',@preCall2);
@@ -169,20 +170,20 @@ end
 try, a=audioDeviceReader('Device','asdf'); catch me; str=regexp(regexprep(me.message,'.*Valid values are:',''),'"([^"]*)"','tokens'); strINPUT=[str{:}]; end;
 try, a=audioDeviceWriter('Device','asdf'); catch me; str=regexp(regexprep(me.message,'.*Valid values are:',''),'"([^"]*)"','tokens'); strOUTPUT=[str{:}]; end;
 
-% set audio input, stim output, and trigger devices
-switch host
-    case '677-GUE-WL-0010' % AM work laptop
-        ipind = find(contains(strINPUT, 'Default'));
-        opind = find(contains(strOUTPUT, 'Default'));
-        
-    otherwise % assume we're connected to a usable focusfrite
-        % get focusrite device input number
-        ipind = find(contains(strINPUT, 'Analogue')&contains(strINPUT, 'Focusrite'));
-        % get focusrite device output number
-        opind = find(contains(strOUTPUT, 'Speakers')&contains(strOUTPUT, 'Focusrite'));
+%%%%% set audio input, stim output, and trigger devices
+% get focusrite device input number
+ipind = find(contains(strINPUT, 'Analogue')&contains(strINPUT, 'Focusrite'));
+% get focusrite device output number
+opind = find(contains(strOUTPUT, 'Speakers')&contains(strOUTPUT, 'Focusrite'));
+
+ % if focusrite not found, use computer-specific audio in/out
+if isempty(ipind)
+    switch host
+        case {'677-GUE-WL-0010','amsmeier'} % AM work/personal laptop
+            ipind = find(contains(strINPUT, 'Default'));
+            opind = find(contains(strOUTPUT, 'Default'));
+    end
 end
-
-
 
 % get trigger device number
 tgind = find(contains(strOUTPUT, 'Playback')&contains(strOUTPUT, 'Focusrite'));
@@ -191,7 +192,8 @@ strVisual={'orthography'};
 
 % GUI for user to modify options
 fnames=fieldnames(expParams);
-% fnames=fnames(~ismember(fnames,{'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender','repetitions_per_qa_per_block','shuffle_within_block','show_question_orthography', 'scan', 'deviceMic','deviceHead','deviceScan'}));
+fnames=fnames(~ismember(fnames,{'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender',...
+    'repetitions_per_qa_per_block','shuffle_within_block','show_question_orthography', 'scan', 'deviceMic','deviceHead','deviceScan'}));
 for n=1:numel(fnames)
     val=expParams.(fnames{n});
     if ischar(val), fvals{n}=val;
@@ -220,30 +222,41 @@ default_width = 0.04; %0.08;
 default_intvl = 0.05; %0.10;
 
 thfig=dialog('units','norm','position',[.3,.3,.3,.5],'windowstyle','normal','name','FLvoice_run options','color','w','resize','on');
-uicontrol(thfig,'style','text','units','norm','position',[.1,.92,.8,default_width],'string','Experiment information:','backgroundcolor','w','fontsize',default_fontsize,'fontweight','bold');
+uicontrol(thfig,'style','text','units','norm','position',[.1,.92,.8,default_width],...
+    'string','Experiment information:','backgroundcolor','w','fontsize',default_fontsize,'fontweight','bold');
 
 ht_txtlist = {};
 ht_list = {};
 for ind=1:size(out_dropbox,2)
-    ht_txtlist{ind} = uicontrol(thfig,'style','text','units','norm','position',[.1,.75-(ind-3)*default_intvl,.35,default_width],'string',[out_dropbox{ind}, ':'],'backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
-    ht_list{ind} = uicontrol(thfig,'style','edit','units','norm','position',[.5,.75-(ind-3)*default_intvl,.4,default_width],'string', fvals_o{ind}, 'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1,'callback',@thfig_callback3);
+    ht_txtlist{ind} = uicontrol(thfig,'style','text','units','norm','position',[.1,.75-(ind-3)*default_intvl,.35,default_width],...
+        'string',[out_dropbox{ind}, ':'],'backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
+    ht_list{ind} = uicontrol(thfig,'style','edit','units','norm','position',[.5,.75-(ind-3)*default_intvl,.4,default_width],...
+        'string', fvals_o{ind}, 'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1,'callback',@thfig_callback3);
 end
 
 % pop up menu that presents timing options
-ht1=uicontrol(thfig,'style','popupmenu','units','norm','position',[.1,.75-8*default_intvl,.4,default_width],'string',fnames,'value',1,'fontsize',default_fontsize-1,'callback',@thfig_callback1);
-ht2=uicontrol(thfig,'style','edit','units','norm','position',[.5,.75-8*default_intvl,.4,default_width],'string','','backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1,'callback',@thfig_callback2);
+ht1=uicontrol(thfig,'style','popupmenu','units','norm','position',[.1,.75-8*default_intvl,.4,default_width],...
+    'string',fnames,'value',1,'fontsize',default_fontsize-1,'callback',@thfig_callback1);
+ht2=uicontrol(thfig,'style','edit','units','norm','position',[.5,.75-8*default_intvl,.4,default_width],...
+    'string','','backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1,'callback',@thfig_callback2);
 
 % displays input devices
-uicontrol(thfig,'style','text','units','norm','position',[.1,.75-9*default_intvl,.35,default_width],'string','Microphone:','backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
-ht3a=uicontrol(thfig,'style','popupmenu','units','norm','position',[.5,.75-9*default_intvl,.4,default_width],'string',strINPUT,'value',ipind,'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1);
+uicontrol(thfig,'style','text','units','norm','position',[.1,.75-9*default_intvl,.35,default_width],...
+    'string','Microphone:','backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
+ht3a=uicontrol(thfig,'style','popupmenu','units','norm','position',[.5,.75-9*default_intvl,.4,default_width],...
+    'string',strINPUT,'value',ipind,'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1);
 
 % displays output devices
-uicontrol(thfig,'style','text','units','norm','position',[.1,.75-10*default_intvl,.35,default_width],'string','Sound output:','backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
-ht3b=uicontrol(thfig,'style','popupmenu','units','norm','position',[.5,.75-10*default_intvl,.4,default_width],'string',strOUTPUT,'value',opind,'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1);
+uicontrol(thfig,'style','text','units','norm','position',[.1,.75-10*default_intvl,.35,default_width],...
+    'string','Sound output:','backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
+ht3b=uicontrol(thfig,'style','popupmenu','units','norm','position',[.5,.75-10*default_intvl,.4,default_width],...
+    'string',strOUTPUT,'value',opind,'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1);
 
 % displays trigger devices
-ht3c0=uicontrol(thfig,'style','text','units','norm','position',[.1,.75-11*default_intvl,.35,default_width],'string','Scanner trigger:','backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
-ht3c=uicontrol(thfig,'style','popupmenu','units','norm','position',[.5,.75-11*default_intvl,.4,default_width],'string',strOUTPUT,'value',tgind,'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1);
+ht3c0=uicontrol(thfig,'style','text','units','norm','position',[.1,.75-11*default_intvl,.35,default_width],...
+    'string','Scanner trigger:','backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
+ht3c=uicontrol(thfig,'style','popupmenu','units','norm','position',[.5,.75-11*default_intvl,.4,default_width],...
+    'string',strOUTPUT,'value',tgind,'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1);
 
 uicontrol(thfig,'style','pushbutton','string','Start','units','norm','position',[.1,.01,.38,.10],'callback','uiresume','fontsize',default_fontsize-1);
 uicontrol(thfig,'style','pushbutton','string','Cancel','units','norm','position',[.51,.01,.38,.10],'callback','delete(gcbf)','fontsize',default_fontsize-1);
@@ -278,7 +291,7 @@ if ~ok, return; end
 expParams.deviceMic=strINPUT{get(ht3a,'value')};
 expParams.deviceHead=strOUTPUT{get(ht3b,'value')};
 
-if expParams.scan % skip this assignment if we're not scanning; if focusrite is not connected, it generate error here
+if expParams.scan % skip this assignment if we're not scanning; if focusrite is not connected, it generates error here
     expParams.deviceScan=strOUTPUT{get(ht3c,'value')};
 end
 delete(thfig);
@@ -320,7 +333,11 @@ filepath = [expParams.root, filesep, sprintf('sub-%s',expParams.subject), filese
     filesep, 'beh', filesep, expParams.task];
 unique_answers_file  = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_qa-list.tsv',expParams.subject, expParams.session, expParams.runstring, expParams.task));
 Output_name = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_desc-presentation.mat',expParams.subject, expParams.session, expParams.runstring, expParams.task));
-if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite', questdlg(sprintf('This subject %s already has an data file for this ses-%d_run-%s (task: %s), do you want to over-write?', expParams.subject, expParams.session, expParams.runstring, expParams.task),'Answer', 'Yes - overwrite', 'No - quit','No - quit')), return; end
+if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite',...
+        questdlg(sprintf('This subject %s already has an data file for this ses-%d_run-%s (task: %s), do you want to over-write?',...
+        expParams.subject, expParams.session, expParams.runstring, expParams.task),...
+        'Answer', 'Yes - overwrite', 'No - quit','No - quit')), return; 
+end
 
 % read text files and condition labels
 % % % % % % % % % % % % % % % % % Input_files=regexp(fileread(Input_textname),'[\n\r]+','split');
