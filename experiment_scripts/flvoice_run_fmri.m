@@ -200,8 +200,8 @@ for n=1:numel(fnames)
     end
 end
 
-expParams.condition_blocks = {'observed';'unobserved';'observed';'unobserved'}; % move these params to json config
-% expParams.condition_blocks = {'unobserved';'observed';'observed';'unobserved'}; % move these params to json config
+% expParams.condition_blocks = {'observed';'unobserved';'observed';'unobserved'}; % move these params to json config
+expParams.condition_blocks = {'unobserved';'observed';'observed';'unobserved'}; % move these params to json config
 % expParams.condition_blocks = {'unobserved'}; 
 % expParams.condition_blocks = {'observed';'observed';'observed'};
 % expParams.condition_blocks = {'unobserved';'unobserved';'unobserved'};
