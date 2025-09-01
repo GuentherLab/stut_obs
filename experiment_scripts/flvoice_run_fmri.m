@@ -37,15 +37,12 @@ num_run_digits = 2; % number of digits to include in run number labels in filena
 %
 % FLVOICE_RUN(option_name1, option_value1, ...)
 % specifies additional options:
-%       visual                      : type of visual presentation ['figure']
 %       root                        : root directory [pwd]
 %       textpath                    : directory for audio stimuli [pwd/stimuli/text/Adults]
-%       figurespath                 : directory for visual stimuli [pwd/stimuli/figures/Adults]
 %       subject                     : subject ID ['TEST01']
 %       session                     : session number [1]
 %       run                         : run number [1]
 %       task                        : task name ['jackson20']
-%       gender                      : subject gender ['unspecified']
 %       scan                        : true/false include scanning segment in experiment sequence [1] 
 %       timePostStim                : time (s) from end of the text stimulus presentation to the GO signal (D1 in schematic above) (one value for fixed time, two values for minimum-maximum range of random times) [.25 .75] 
 %       timePostOnset               : time (s) from subject's voice onset to the scanner trigger (or to pre-stimulus segment, if scan=false) (D2 in schematic above) (one value for fixed time, two values for minimum-maximum range of random times) [4.5] 
@@ -75,11 +72,7 @@ num_run_digits = 2; % number of digits to include in run number labels in filena
 ET = tic;
 [dirs, host] = set_paths_stut_obs(); % set project paths and get computer name
 
-if strcmp(host, '677-GUE-WL-0009')
-    default_fontsize = 10;
-else
-    default_fontsize = 15;
-end
+default_fontsize = 12;
 
 % select json files
 preFlag = false;
@@ -125,7 +118,6 @@ if preFlag
     expParams = expRead;
 else % if no preset config file defined
     expParams=struct(...
-        'visual', 'orthography', ...
         'root', 'C:\ieeg_stut', ...
         'textpath', fullfile(pwd, 'stimuli', 'text'), ...
         'subject','sub-example',...
@@ -133,9 +125,13 @@ else % if no preset config file defined
         'run', 1,...
         'task', 'jackson20', ...
         'scan', true, ...
-        'gender', 'unspecified', ...
-        'repetitions_per_qa_per_block', 1, ...
-        'shuffle_within_block', true, ...
+        'repetitions_per_unique_qa', 1, ...
+        'shuffle_qa_order', true, ... % specifically affects stim order, not baseline trials
+        'max_unique_qa_repeats',3, ... % max consecutive repeats of a given QA stim, before baseline trials are mixed in
+        'baseline_trials_proportion',0.5,... % proportion of all trials that are baseline trials
+        'baseline_trials_evenly_spaced',true,.... % whether baseline trals are evenly spaced or shuffled
+        'max_basetrial_repeats',3,... % don't let there be more than this many no-speech trials in row
+        'play_question_audio_stim',false... % play (unobserved condition) or don't play (observed condition) the audio quesiton stim
         'show_question_orthography', false, ...
         'timeStim', [2 2.5],...
         'timePostOnset', 3.5,...
@@ -188,12 +184,14 @@ end
 % get trigger device number
 tgind = find(contains(strOUTPUT, 'Playback')&contains(strOUTPUT, 'Focusrite'));
 
-strVisual={'orthography'};
-
 % GUI for user to modify options
 fnames=fieldnames(expParams);
-fnames=fnames(~ismember(fnames,{'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender',...
-    'repetitions_per_qa_per_block','shuffle_within_block','show_question_orthography', 'scan', 'deviceMic','deviceHead','deviceScan'}));
+fnames=fnames(~ismember(fnames,{'root', 'textpath', 'subject', 'session', 'run', 'task',...
+    'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats',...
+    'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
+    'play_question_audio_stim','show_question_orthography', ...
+    'timeStim','timePostOnset', 'timePreStim','timeMax','timeNoOnset', 'timeScan',...
+    'scan', 'deviceMic','deviceHead','deviceScan'}));
 for n=1:numel(fnames)
     val=expParams.(fnames{n});
     if ischar(val), fvals{n}=val;
@@ -202,14 +200,13 @@ for n=1:numel(fnames)
     end
 end
 
-% expParams.condition_blocks = {'observed';'unobserved';'observed';'unobserved'}; % move these params to json config
-expParams.condition_blocks = {'unobserved';'observed';'observed';'unobserved'}; % move these params to json config
-% expParams.condition_blocks = {'unobserved'}; 
-% expParams.condition_blocks = {'observed';'observed';'observed'};
-% expParams.condition_blocks = {'unobserved';'unobserved';'unobserved'};
-% expParams.condition_blocks = {'observed'}
 
-out_dropbox = {'visual', 'root', 'textpath', 'subject', 'session', 'run', 'task', 'gender', 'scan'};
+out_dropbox = {'root', 'textpath', 'subject', 'session', 'run', 'task',...
+    'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats',...
+    'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
+    'play_question_audio_stim','show_question_orthography', ...
+    'timeStim','timePostOnset', 'timePreStim','timeMax','timeNoOnset', 'timeScan',...
+    'scan', 'deviceMic','deviceHead','deviceScan'};
 for n=1:numel(out_dropbox)
     val=expParams.(out_dropbox{n});
     if ischar(val), fvals_o{n}=val;
@@ -218,10 +215,10 @@ for n=1:numel(out_dropbox)
     end
 end
 
-default_width = 0.04; %0.08;
-default_intvl = 0.05; %0.10;
+default_width = 0.02;
+default_intvl = 0.03; 
 
-thfig=dialog('units','norm','position',[.3,.3,.3,.5],'windowstyle','normal','name','FLvoice_run options','color','w','resize','on');
+thfig=dialog('units','norm','position',[.2,.1,.6,.9],'windowstyle','normal','name','Experiment options','color','w','resize','on');
 uicontrol(thfig,'style','text','units','norm','position',[.1,.92,.8,default_width],...
     'string','Experiment information:','backgroundcolor','w','fontsize',default_fontsize,'fontweight','bold');
 
@@ -328,6 +325,7 @@ TIME_PREPARE = 0.5; % Waiting period before experiment begin (sec)
 set(annoStr.Stim, 'String', 'Preparing...');
 set(annoStr.Stim, 'Visible','on');
 
+%% load stim list
 % root path is where the subject description files are
 filepath = [expParams.root, filesep, sprintf('sub-%s',expParams.subject), filesep, sprintf('ses-%d',expParams.session),...
     filesep, 'beh', filesep, expParams.task];
@@ -339,49 +337,73 @@ if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite',...
         'Answer', 'Yes - overwrite', 'No - quit','No - quit')), return; 
 end
 
-% read text files and condition labels
-% % % % % % % % % % % % % % % % % Input_files=regexp(fileread(Input_textname),'[\n\r]+','split');
-
-
-
-expParams.nblocks = length(expParams.condition_blocks); 
+%% create trial table
 unique_qa = readtable(unique_answers_file,'FileType','text');
 n_unique_qa = height(unique_qa); 
-expParams.ntrials_per_block = n_unique_qa * expParams.repetitions_per_qa_per_block; 
-expParams.ntrials = expParams.nblocks * expParams.ntrials_per_block;
-celcol = cell(expParams.ntrials,1); 
-trials = table([1:expParams.ntrials]', celcol,celcol, repelem(expParams.condition_blocks, expParams.ntrials_per_block, 1), 'VariableNames',...
-                {'trialnum',    'question','answer', 'condition'} );
+expParams.n_speech_trials = n_unique_qa * expParams.repetitions_per_unique_qa; 
 
+% make list of speech trials, shuffle if specified
+trials_speech = repelem(unique_qa, expParams.repetitions_per_unique_qa, 1);
+if expParams.shuffle_qa_order
+    trials_speech = trials_speech(randperm(height(trials_speech)), :);
 
-for iblock = 1:expParams.nblocks
-    blockinds = 1 + expParams.ntrials_per_block*[iblock-1]  : expParams.ntrials_per_block*iblock; % trialinds within this block
-    block_trials_qa = repmat(unique_qa, expParams.repetitions_per_qa_per_block, 1); % copy each word expParams.repetitions_per_qa_per_block times
-    if expParams.shuffle_within_block
-        block_trials_qa = block_trials_qa(randperm(height(block_trials_qa)), :); % shuffle within block
+    % check for stim repeats
+    qa_sequence_lengths = accumarray(cumsum([true; ~strcmp(trials_speech.answer(1:end-1), trials_speech.answer(2:end))]), 1); % sequences of repeated qa stim trials 
+    max_repeated_qa = max(qa_sequence_lengths); 
+
+     % if we exceed max unique repeats, then reshuffle
+    while max_repeated_qa > expParams.max_unique_qa_repeats
+        trials_speech = trials_speech(randperm(height(trials_speech)), :);; % reshuffle
+        qa_sequence_lengths = accumarray(cumsum([true; ~strcmp(trials_speech.answer(1:end-1), trials_speech.answer(2:end))]), 1); % sequences of repeated qa stim trials 
+        max_repeated_qa = max(qa_sequence_lengths); 
     end
-    trials(blockinds,{'question','answer','stimfile'}) = block_trials_qa(:,{'question','answer','stimfile'}); % fill into trials for this block
-    % % % % % % % % % % % % trials.condition(blockinds) = expParams.condition_blocks{iblock}; 
+
 end
 
+% add baseline trials
+    % formula:    baseprop / [1-baseprop] = nbase/[nspeech]..... nbase = nspeech * [baseprop / (1-baseprop)]
+expParams.n_base_trials = round(expParams.n_speech_trials * expParams.baseline_trials_proportion / [1-expParams.baseline_trials_proportion]); 
+expParams.ntrials = expParams.n_speech_trials + expParams.n_base_trials; 
+trials_speech.basetrial(1:height(trials_speech)) = false; 
+baserow = trials_speech(1,:);
+    baserow.question{1} = '';
+    baserow.answer{1} = '';
+    baserow.n_syls(1) = NaN;
+    baserow.basetrial = true; 
+if expParams.baseline_trials_evenly_spaced
+    % linearly space baseline trials
+    start_base_trial = max([2 expParams.ntrials/expParams.n_base_trials]); % start base trials later than speech trials; trial 1 is never base
+    baseinds = round(linspace(start_base_trial, expParams.ntrials, expParams.n_base_trials));
+    isbase = false(expParams.ntrials,1); 
+    isbase(baseinds) = true; 
+elseif ~expParams.baseline_trials_evenly_spaced
+    isbase = [false(expParams.n_speech_trials,1); true(expParams.n_base_trials,1)];
+    isbase = isbase(randperm(length(isbase),length(isbase)), :); % shuffle base trial locations
+    base_sequence_lengths = diff(find([0; diff(isbase)])); % sequences of repeated baseline trials 
+    max_repeated_base = max(base_sequence_lengths); 
 
+     % if the first trial is a baseline trial, or if we exceed max baseline trials, then reshuffle
+    while isbase(1)   ||   max_repeated_base > expParams.max_basetrial_repeats
+        isbase = isbase(randperm(length(isbase),length(isbase)), :); % reshuffle
+        base_sequence_lengths = diff(find([0; diff(isbase)])); % sequences of repeated baseline trials 
+        max_repeated_base = max(base_sequence_lengths); 
+    end
+end
+trials = table; 
+trials(isbase,:) = repmat(baserow, expParams.n_base_trials, 1); % fill in baseline trials
+trials(~isbase,:) = trials_speech; % fill in speech trials
+
+
+
+
+
+
+%%
 
 % % % % % % % % % % % % % % % % stimreads=cell(size(Input_files));
 % % % % % % % % % % % % % % % % stimreads(NoNull) = cellfun(@(x)fileread(x),Input_files(NoNull),'uni',0);
 sileread = dsp.AudioFileReader(fullfile(expParams.textpath, 'silent.wav'), 'SamplesPerFrame', 2048);
 
-% % % % % % % if isempty(dir(Input_condname))
-% % % % % % %     [nill,Input_conditions]=arrayfun(@fileparts,Input_files,'uni',0);
-% % % % % % % else
-% % % % % % %     Input_conditions=regexp(fileread(Input_condname),'[\n\r]+','split');
-% % % % % % %     Input_conditions=Input_conditions(cellfun('length',Input_conditions)>0);
-% % % % % % %     assert(numel(Input_files)==numel(Input_conditions),'unequal number of lines/trials in %s (%d) and %s (%d)',unique_answers_file, numel(Input_files), Input_condname, numel(Input_conditions));
-% % % % % % % end
-% % % % % % % expParams.ntrials = length(Input_conditions); % pull out the number of trials from the stimList
-
-% create random number stream so randperm doesn't call the same thing everytime when matlab is opened
-s = RandStream.create('mt19937ar','seed',sum(100*clock));
-RandStream.setGlobalStream(s);
 
 % set audio device variables: deviceReader: mic input; beepPlayer: beep output; triggerPlayer: trigger output
 if isempty(expParams.deviceMic)
@@ -594,9 +616,6 @@ for itrial = 1:expParams.ntrials
         '\n']);
 
 
-    SpeechTrial=~strcmp(trialData(itrial).condition,'NULL');
-
-
     prepareScan=0.250*(expParams.scan~=0); % if scanning, end recording 250ms before scan trigger
     % set up variables for audio recording and voice detection
     recordLen= trialData(itrial).timeMax-prepareScan; % max total recording time
@@ -620,7 +639,7 @@ for itrial = 1:expParams.ntrials
     setup(deviceReader) % note: moved this here to avoid delays in time-sensitive portion
 
     if isempty(CLOCK)
-        CLOCK = ManageTime('start');                        % resets clock to t=0 (first-trial start-time)
+        CLOCK = ManageTime('start');    % resets clock to t=0 (first-trial start-time)
         TIME_TRIAL_START = 0;
         TIME_STIM_START = 0;
     else
@@ -635,9 +654,7 @@ for itrial = 1:expParams.ntrials
     set(annoStr.Plus, 'Visible','off');        
     set(annoStr.Stim, 'color', 'w');
     
-    % Check condition to determine what to display
-
-
+    % determine what to display
     if expParams.show_question_orthography
         % Display the orthography stimulus as normal
         set(annoStr.Stim, 'String', stimread);
@@ -652,27 +669,22 @@ for itrial = 1:expParams.ntrials
         set(annoStr.Plus, 'color', 'w');  % ensure it's white
     end
 
-
-    switch trials.condition{itrial}
-        case 'unobserved'
-            % TIME_SOUND_START = TIME_STIM_ACTUALLYSTART + trialData(ii).timePreSound;
-            % ok=ManageTime('wait', CLOCK, TIME_SOUND_START - stimoffset);
-            % ok=ManageTime('wait', CLOCK, TIME_SOUND_START);
-            stim_q_file = [dirs.projrepo, filesep, 'stimuli', filesep,'audio', filesep, trials.stimfile{itrial}, '.mp3']; 
-            [Input_sound, Input_fs] = audioread(stim_q_file); 
-            % stimPlayer = audioplayer(Input_sound,Input_fs, 24, stimID);
-            stimPlayer = audioplayer(Input_sound,Input_fs, 24);
-            play(stimPlayer);
-            % sttInd=1; endMax=size(Input_sound, 1); while sttInd<endMax; headwrite(Input_sound(sttInd:min(sttInd+2047, endMax))); sttInd=sttInd+2048; end; reset(headwrite);
-            TIME_SOUND_ACTUALLYSTART = ManageTime('current', CLOCK);
-            % while ~isDone(stimread); sound=stimread();headwrite(sound);end;release(stimread);reset(headwrite);
-            %%% add code here to display the text files
-            TIME_SOUND_END = TIME_SOUND_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
-            if ~ok, fprintf('i am late for this trial TIME_SOUND_START\n'); end
-        case    'observed'
-
-        otherwise 
-            error('unrecognized behavioral task condition')
+% if unobserved condition, and it's a speech trial, play audio question file
+if expParams.play_question_audio_stim && ~trials.basetrial(itrial)
+        % TIME_SOUND_START = TIME_STIM_ACTUALLYSTART + trialData(ii).timePreSound;
+        % ok=ManageTime('wait', CLOCK, TIME_SOUND_START - stimoffset);
+        % ok=ManageTime('wait', CLOCK, TIME_SOUND_START);
+        stim_q_file = [dirs.projrepo, filesep, 'stimuli', filesep,'audio', filesep, trials.stimfile{itrial}, '.mp3']; 
+        [Input_sound, Input_fs] = audioread(stim_q_file); 
+        % stimPlayer = audioplayer(Input_sound,Input_fs, 24, stimID);
+        stimPlayer = audioplayer(Input_sound,Input_fs, 24);
+        play(stimPlayer);
+        % sttInd=1; endMax=size(Input_sound, 1); while sttInd<endMax; headwrite(Input_sound(sttInd:min(sttInd+2047, endMax))); sttInd=sttInd+2048; end; reset(headwrite);
+        TIME_SOUND_ACTUALLYSTART = ManageTime('current', CLOCK);
+        % while ~isDone(stimread); sound=stimread();headwrite(sound);end;release(stimread);reset(headwrite);
+        %%% add code here to display the text files
+        TIME_SOUND_END = TIME_SOUND_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
+        if ~ok, fprintf('i am late for this trial TIME_SOUND_START\n'); end
     end
 
     TIME_TEXT_END = TIME_TEXT_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
@@ -686,11 +698,15 @@ for itrial = 1:expParams.ntrials
     if ~ok, fprintf('i am late for this trial TIME_GOSIGNAL_START - beepoffset\n'); end
     
     ok=ManageTime('wait', CLOCK, TIME_GOSIGNAL_START);     % waits for GO signal time
-    % GO signal goes with beep
-    while ~isDone(beepread); sound=beepread();headwrite(sound);end;reset(beepread);reset(headwrite);
-    set(annoStr.Plus, 'Visible','off'); % remove fixcross
-    set(annoStr.Stim, 'Visible','off'); % remove stim question orthography if it's there (unobserved condition)
-    set(annoStr.GoRect, 'Visible', 'on');  % <-- SHOW GREEN RECTANGLE
+
+    % play beep and switch to visual go cue if it's a speech trial
+    if ~trials.basetrial(itrial)
+        % GO signal goes with beep
+        while ~isDone(beepread); sound=beepread();headwrite(sound);end;reset(beepread);reset(headwrite);
+        set(annoStr.Plus, 'Visible','off'); % remove fixcross
+        set(annoStr.Stim, 'Visible','off'); % remove stim question orthography if it's there (unobserved condition)
+        set(annoStr.GoRect, 'Visible', 'on');  % <-- SHOW GREEN RECTANGLE
+    end
 
     TIME_GOSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK); % actual time for GO signal 
     if ~ok, fprintf('i am late for this trial TIME_GOSIGNAL_START\n'); end
@@ -698,11 +714,9 @@ for itrial = 1:expParams.ntrials
     % reaction time
     TIME_VOICE_START = TIME_GOSIGNAL_ACTUALLYSTART + nonSpeechDelay;                   % expected voice onset time
 
-    TIME_SCAN_START = TIME_GOSIGNAL_ACTUALLYSTART + SpeechTrial * trialData(itrial).timeMax + (1-SpeechTrial)*expParams.timeNULL;
+    TIME_SCAN_START = TIME_GOSIGNAL_ACTUALLYSTART + trials.basetrial(itrial) * trialData(itrial).timeMax + (1-trials.basetrial(itrial))*expParams.timeNULL;
 
-    % if SpeechTrial (when condition not null), numSamples we record for
-    % is nSamples else nSamplesNULL
-    endSamples = SpeechTrial * nSamples + (1-SpeechTrial)*nSamplesNULL;
+    endSamples = trials.basetrial(itrial) * nSamples + (1-trials.basetrial(itrial))*nSamplesNULL;
     while endIdx < endSamples
         % find beginning/end indices of frame
         begIdx = (frameCount*expParams.frameLength)-(expParams.frameLength-1) + nMissingSamples;
@@ -723,14 +737,14 @@ for itrial = 1:expParams.ntrials
         minVoiceOnsetTime = max(0, expParams.minVoiceOnsetTime-(begIdx+numOverrun)/expParams.sr);
         
         % detect beep onset
-        if SpeechTrial && beepDetected == 0 && expParams.minVoiceOnsetTime > (begIdx+numOverrun)/expParams.sr
+        if trials.basetrial(itrial) && beepDetected == 0 && expParams.minVoiceOnsetTime > (begIdx+numOverrun)/expParams.sr
             % look for beep onset
             [beepDetected, bTime, beepOnsetState]  = detectVoiceOnset(recAudio(begIdx+numOverrun:endIdx+numOverrun), expParams.sr, expParams.rmsThreshTimeOnset, rmsBeepThresh, 0, beepOnsetState);
             if beepDetected
                 beepTime = bTime + (begIdx+numOverrun)/expParams.sr; 
                 set(micLineB,'value',beepTime,'visible','on');
             end
-        elseif SpeechTrial && voiceOnsetDetected == 0,% && frameCount > onsetWindow/frameDur
+        elseif trials.basetrial(itrial) && voiceOnsetDetected == 0,% && frameCount > onsetWindow/frameDur
             if ~beepDetected; beepTime = 0; disp('Beep not detected. Assign beepTime = 0.'); end
             trialData(itrial).beepTime = beepTime;
 
@@ -762,33 +776,28 @@ for itrial = 1:expParams.ntrials
         frameCount = frameCount+1;
 
     end
-    if SpeechTrial && voiceOnsetDetected == 0, fprintf('warning: voice was expected but not detected (rmsThresh = %f)\n',rmsThresh); end
+    if trials.basetrial(itrial) && voiceOnsetDetected == 0, fprintf('warning: voice was expected but not detected (rmsThresh = %f)\n',rmsThresh); end
     release(deviceReader); % end recording
     
     % Hide stimulus regardless of condition
     set(annoStr.Stim, 'color','w');
     set(annoStr.Stim, 'Visible','off');
-    % % % % % % % % % % % % set(annoStr.Plus, 'color','r');
-    % % % % % % % % % % % % set(annoStr.Plus, 'Visible','on');
-
-    % For observed condition, 
-    % For unobserved condition, show the red fixation cross as normal
 
 
-    if expParams.show_question_orthography
-            set(annoStr.Stim, 'String', stimread);
-            set(annoStr.Stim, 'Visible', 'On');
-    elseif ~expParams.show_question_orthography % the fixation cross was never turned off
-            % For observed condition, keep the white fixation cross
-            set(annoStr.Plus, 'color','r');  
-            set(annoStr.Plus, 'Visible','on');
+    % end-of-trial visual stim for speech trials
+    if ~trials.basetrial(itrial)
+
+                      %% REMOVE GO ARROW HERE
+
+
+        set(annoStr.Plus, 'color','r');  
+        set(annoStr.Plus, 'Visible','on');
     end
 
 
-    set(annoStr.GoRect, 'Visible', 'off');  % <-- HIDE GREEN RECTANGLE
+    
 
-            
-
+          
     %% save voice onset time and determine how much time left before sending trigger to scanner
     if voiceOnsetDetected == 0 %if voice onset wasn't detected
         trialData(itrial).onsetDetected = 0;
@@ -809,7 +818,7 @@ for itrial = 1:expParams.ntrials
         NEXTTRIAL = TIME_SCAN_END + trialData(itrial).timePreStim;
         if ~ok, fprintf('i am late for this trial TIME_SCAN_START\n'); end
         
-        if SpeechTrial; intvs = [intvs TIME_SCAN_START - TIME_GOSIGNAL_START]; expParams.timeNULL = mean(intvs); end
+        if trials.basetrial(itrial); intvs = [intvs TIME_SCAN_START - TIME_GOSIGNAL_START]; expParams.timeNULL = mean(intvs); end
 
         if isnan(trialData(itrial).voiceOnsetTime)
             expdur = trialData(itrial).timePreStim + trialData(itrial).timeStim + trialData(itrial).timeNoOnset + trialData(itrial).timeScan + 0.5 + nonSpeechDelay; % add the other average wait time if no onset
@@ -833,7 +842,7 @@ for itrial = 1:expParams.ntrials
     %% save for each trial
     trialData(itrial).s = recAudio(1:nSamples);
     trialData(itrial).fs = expParams.sr;
-    if SpeechTrial&&voiceOnsetDetected, trialData(itrial).reference_time = voiceOnsetTime;
+    if trials.basetrial(itrial) && voiceOnsetDetected, trialData(itrial).reference_time = voiceOnsetTime;
     else trialData(itrial).reference_time = nonSpeechDelay;
     end
     trialData(itrial).percMissingSamples = (nMissingSamples/(recordLen*expParams.sr))*100;
