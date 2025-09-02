@@ -81,16 +81,7 @@ annoStr.Plus = annotation(VBFig,'textbox', cuAnoPos,...
     cSettings{:});
 set(annoStr.Plus, 'FontSize', 200);
 
-% GO arrow
-annoStr.goArrow = annotation(VBFig,'arrow',...
-    'X',[0.7 0.3], 'Y',[0.5 0.5],...
-    'HeadStyle', 'plain',...
-    'HeadSize', 100,...
-    'LineWidth',50,...
-    'Color',[0 1 0],... 
-    )
-
-% Stim orthography annotation
+% Stim annotation
 annoStr.Stim = annotation(VBFig,'textbox', stimAnoPos,...
     'String',{'stim'},...
     cSettings{:});
@@ -99,6 +90,20 @@ annoStr.Pic = axes(VBFig, 'pos',[1/2-winPos(4)/(4*winPos(3)) 0.25 winPos(4)/(2*w
 axes(annoStr.Pic)
 imshow([])
 drawnow
+
+% Green square GO cue
+% Get screen size for rectangle positioning
+% % % % % % % % % % % % % % % % % % % % % % % % screenSize = get(0, 'ScreenSize'); % [left bottom width height]
+% % % % % % % % % % % % % % % % % % % % % % % % rectWidth = screenSize(3) * expParams.rectWidthProp;
+% % % % % % % % % % % % % % % % % % % % % % % % rectHeight = screenSize(4) * expParams.rectHeightProp;
+% % % % % % % % % % % % % % % % % % % % % % % % rectX = (screenSize(3) - rectWidth) / 2;  % center horizontally
+% % % % % % % % % % % % % % % % % % % % % % % % rectY = (screenSize(4) - rectHeight) / 2; % center vertically
+
+% Create rectangle (initially invisible)
+% % % % % % % annoStr.GoRect = rectangle('Position', [0.5, 0.7, 0.6, 0.3], ...
+% % % % % % %                           'FaceColor', [0 1 0], ...
+% % % % % % %                           'EdgeColor', 'none', ...
+% % % % % % %                           'Visible', 'off');
 
 % Calculate position and size based on proportion variables
 rectX = (1 - op.rectWidthProp) / 2;     % center horizontally
@@ -167,5 +172,26 @@ end
 
 
 
+%% Commands to use within the main script / trial
+% Use the following to set up the visual annotations and
+% manipulate stim presentation
 
+% sets up 'annoStr' variable which is used to manipulate the
+% created visual annotations
+%        annoStr = setUpVisAnnot();
+
+% How to turn specific annotation 'on' / 'off'
+%       set(annoStr.Ready, 'Visible','on');  % Turn on 'Ready?'
+%       set(annoStr.Ready, 'Visible','off'); % Turn off 'Ready?'
+
+%       set(annoStr.Plus, 'Visible','on');   % Turn on fixation 'Cross'
+%       set(annoStr.Plus, 'Visible','off');  % Turn off fixation 'Cross'
+
+%       annoStr.Stim.String = 'stim1';      % change the stimulus to desired word (in this case 'stim1')
+
+%       set(annoStr.Stim,'Visible','on');  % Turn on stimulus
+%       set(annoStr.Stim,'Visible','off');  % Turn off stimulus
+
+%       set([annoStr.Stim annoStr.visTrig],'Visible','on');  % Turn on stimulus + trigger box
+%       set([annoStr.Stim annoStr.visTrig],'Visible','off'); % Turn off stimulus + trigger box
 
