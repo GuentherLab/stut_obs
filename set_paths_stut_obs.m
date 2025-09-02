@@ -1,4 +1,4 @@
-function [dirs, host] = set_paths_ieeg_stut()
+function [dirs, host] = set_paths_stut_obs()
 % [paths, host] = set_paths_ieeg_stut()
 %
 % setting up directory paths for project
