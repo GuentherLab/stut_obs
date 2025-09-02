@@ -1,6 +1,6 @@
 {
     "root": "C:\\ieeg_stut",
-    "textpath": "C:\\docs\\code\\stut_obs\\stimuli\\text",
+    "audio_common_path": "C:\\docs\\code\\stut_obs\\stimuli\\audio",
     "subject": "example",
     "session": 1,
     "run": 1,

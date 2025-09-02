@@ -36,9 +36,9 @@ num_run_digits = 2; % number of digits to include in run number labels in filena
 %
 %
 % FLVOICE_RUN(option_name1, option_value1, ...)
-% specifies additional options:
+% specifies additional options:% for audio stim shared across subjects
 %       root                        : root directory [pwd]
-%       textpath                    : directory for audio stimuli [pwd/stimuli/text/Adults]
+%       audio_common_path            : % for audio stim shared across subjects
 %       subject                     : subject ID ['TEST01']
 %       session                     : session number [1]
 %       run                         : run number [1]
@@ -119,7 +119,7 @@ if preFlag
 else % if no preset config file defined
     expParams=struct(...
         'root', 'C:\ieeg_stut', ...
-        'textpath', fullfile(pwd, 'stimuli', 'text'), ...
+        'audio_common_path', [dirs.projrep, filesep, 'stimuli', filesep, 'audio'], ... % for audio stim shared across subjects
         'subject','sub-example',...
         'session', 1, ...
         'run', 1,...
@@ -131,7 +131,7 @@ else % if no preset config file defined
         'baseline_trials_proportion',0.5,... % proportion of all trials that are baseline trials
         'baseline_trials_evenly_spaced',true,.... % whether baseline trals are evenly spaced or shuffled
         'max_basetrial_repeats',3,... % don't let there be more than this many no-speech trials in row
-        'play_question_audio_stim',false... % play (unobserved condition) or don't play (observed condition) the audio quesiton stim
+        'play_question_audio_stim',false,... % play (unobserved condition) or don't play (observed condition) the audio quesiton stim
         'show_question_orthography', false, ...
         'timeStim', [2 2.5],...
         'timePostOnset', 3.5,...
@@ -186,7 +186,7 @@ tgind = find(contains(strOUTPUT, 'Playback')&contains(strOUTPUT, 'Focusrite'));
 
 % GUI for user to modify options
 fnames=fieldnames(expParams);
-fnames=fnames(~ismember(fnames,{'root', 'textpath', 'subject', 'session', 'run', 'task',...
+fnames=fnames(~ismember(fnames,{'root','subject', 'session', 'run', 'task',...
     'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats',...
     'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
     'play_question_audio_stim','show_question_orthography', ...
@@ -201,7 +201,7 @@ for n=1:numel(fnames)
 end
 
 
-out_dropbox = {'root', 'textpath', 'subject', 'session', 'run', 'task',...
+out_dropbox = {'root',  'subject', 'session', 'run', 'task',...
     'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats',...
     'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
     'play_question_audio_stim','show_question_orthography', ...
@@ -325,6 +325,12 @@ TIME_PREPARE = 0.5; % Waiting period before experiment begin (sec)
 set(annoStr.Stim, 'String', 'Preparing...');
 set(annoStr.Stim, 'Visible','on');
 
+%%%%%%%% only turn on timing warnings on commandline for debugging or in unobserved condition; otherwise is distracting for experimenter
+show_timing_warnings = expParams.play_question_audio_stim; % 'play_question_audio_stim' is true only in unobserved condition
+
+%%% option to display the upcoming trial on the commandline.... generally unnecessary/distracting during the observed condition
+upcoming_trial_on_commandline = 0; 
+
 %% load stim list
 % root path is where the subject description files are
 dirs.ses = [expParams.root, filesep, sprintf('sub-%s',expParams.subject), filesep, sprintf('ses-%d',expParams.session)];
@@ -400,7 +406,7 @@ trials(~isbase,:) = trials_speech; % fill in speech trials
 
 
 %%
-sileread = dsp.AudioFileReader(fullfile(expParams.textpath, 'silent.wav'), 'SamplesPerFrame', 2048);
+sileread = dsp.AudioFileReader(fullfile(expParams.audio_common_path, 'silent.wav'), 'SamplesPerFrame', 2048);
 
 
 % set audio device variables: deviceReader: mic input; beepPlayer: beep output; triggerPlayer: trigger output
@@ -579,12 +585,11 @@ intvs = [];
 %% LOOP OVER TRIALS
 for itrial = 1:expParams.ntrials
 
-    fprintf('\nRun %s, trial %d/%d\n', expParams.runstring, itrial, expParams.ntrials);
+    % % % % % % % % % % % % % % % % % % fprintf('\nRun %s, trial %d/%d\n', expParams.runstring, itrial, expParams.ntrials);
     set(annoStr.Plus, 'Visible','on');
 
     % trial specific timing parameters with jitter on
     trialData(itrial).question = trials.question{itrial};
-    trialData(itrial).condition = trials.condition{itrial};
     if strcmp(trials.question{itrial}, 'NULL'); 
         trialData(itrial).display = 'yyy'; 
     end
@@ -598,19 +603,24 @@ for itrial = 1:expParams.ntrials
 
     stimread = trials.question{itrial}; 
 
-    % print current and upcoming stimulus questions on command line for the investigator to read
+    % print current trial stim command line for the investigator to read... also (optionally) upcoming stimulus questions
     % print trial number and total trials
-    if itrial ~= expParams.ntrials % if not last trial
+    if upcoming_trial_on_commandline     &&       itrial ~= expParams.ntrials % if not last trial and option turned on
         next_trial_string = ['\n\n      Next trial''s question/answer will be:\n ''', trials.question{itrial+1}, ''' /// ''', trials.answer{itrial+1}, ''''];
-    elseif itrial == expParams.ntrials % if last trial
+    else % if last trial
         next_trial_string = '';
     end
-    fprintf([...
-        '\nThis trial''s stimulus question: ''', trials.question{itrial}, '''', ...
-        '\n      Answer = ''',trials.answer{itrial}, '''',...
-        '\n\n      ........ Trial ', num2str(itrial), '/' num2str(expParams.ntrials), ', Run ', num2str(expParams.runstring), ...
+
+    if trials.basetrial(itrial)
+        experimenter_cue_string = '(BASELINE TRIAL - NO QUESTION)'; 
+    elseif ~trials.basetrial(itrial)
+       experimenter_cue_string = trials.question{itrial};
+    end
+
+    fprintf(['\n', experimenter_cue_string, ' ........ trial ', num2str(itrial), '/' num2str(expParams.ntrials), ...
+        '\n      [[[[''',trials.answer{itrial}, ''']]]]',...
+        '\n\n'     , ...
         next_trial_string,...
-        '\n      As you finish asking this trial''s question, please press Spacebar to start the anticipation period',...
         '\n']);
 
 
@@ -633,7 +643,7 @@ for itrial = 1:expParams.ntrials
         
     % set up figure for real-time plotting of audio signal of next trial
     figure(rtfig);
-    set(micTitle,'string',sprintf('%s %s run %s trial %d condition: %s', expParams.subject, expParams.task, expParams.runstring, itrial, trialData(itrial).condition));
+    set(micTitle,'string',sprintf('%s %s run %s trial %d ', expParams.subject, expParams.task, expParams.runstring, itrial));
     setup(deviceReader) % note: moved this here to avoid delays in time-sensitive portion
 
     if isempty(CLOCK)
@@ -648,7 +658,14 @@ for itrial = 1:expParams.ntrials
     % start of the trial
     TIME_TEXT_ACTUALLYSTART = ManageTime('current', CLOCK);
     
-    if ~ok, fprintf('i am late for this trial TIME_TRIAL_START\n'); end
+
+
+    %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+    if show_timing_warnings
+        if ~ok, fprintf('i am late for this trial TIME_TRIAL_START\n'); end
+    end
+    
+    
     set(annoStr.Plus, 'Visible','off');        
     set(annoStr.Stim, 'color', 'w');
     
@@ -681,19 +698,29 @@ for itrial = 1:expParams.ntrials
         TIME_SOUND_ACTUALLYSTART = ManageTime('current', CLOCK);
         % while ~isDone(stimread); sound=stimread();headwrite(sound);end;release(stimread);reset(headwrite);
         TIME_SOUND_END = TIME_SOUND_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
-        if ~ok, fprintf('i am late for this trial TIME_SOUND_START\n'); end
+
+        %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+        % if show_timing_warnings
+        %     if ~ok, fprintf('i am late for this trial TIME_SOUND_START\n'); end
+        % end
     end
 
     TIME_TEXT_END = TIME_TEXT_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
-    if ~ok, fprintf('i am late for this trial TIME_TEXT_END\n'); end
 
+    %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+    % if show_timing_warnings
+    %     if ~ok, fprintf('i am late for this trial TIME_TEXT_END\n'); end
+    % end
     TIME_GOSIGNAL_START = TIME_TEXT_END;          % GO signal time
     set(micLine,'visible','off');set(micLineB,'visible','off');drawnow;
         
     ok=ManageTime('wait', CLOCK, TIME_GOSIGNAL_START - beepoffset);     % waits for recorder initialization time
     [nill, nill] = deviceReader(); % note: this line may take some random initialization time to run; audio signal start (t=0) will be synchronized to the time when this line finishes running
-    if ~ok, fprintf('i am late for this trial TIME_GOSIGNAL_START - beepoffset\n'); end
     
+    %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+    if show_timing_warnings
+        if ~ok, fprintf('i am late for this trial TIME_GOSIGNAL_START - beepoffset\n'); end
+    end
     ok=ManageTime('wait', CLOCK, TIME_GOSIGNAL_START);     % waits for GO signal time
 
     % play beep and switch to visual go cue if it's a speech trial
@@ -702,11 +729,19 @@ for itrial = 1:expParams.ntrials
         while ~isDone(beepread); sound=beepread();headwrite(sound);end;reset(beepread);reset(headwrite);
         set(annoStr.Plus, 'Visible','off'); % remove fixcross
         set(annoStr.Stim, 'Visible','off'); % remove stim question orthography if it's there (unobserved condition)
-        set(annoStr.GoArrow, 'Visible', 'on');  % <-- SHOW GREEN ARROW
+        set(annoStr.goArrow, 'Visible', 'on');  % <-- SHOW GREEN ARROW
     end
 
     TIME_GOSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK); % actual time for GO signal 
-    if ~ok, fprintf('i am late for this trial TIME_GOSIGNAL_START\n'); end
+
+    if ~trials.basetrial(itrial)
+       fprintf('\n ------- GREEN GO CUE NOW ONSCREEN, PLAYING BEEP --------\n\n')
+    end
+
+    %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+    if show_timing_warnings
+        if ~ok, fprintf('i am late for this trial TIME_GOSIGNAL_START\n'); end
+    end
 
     % reaction time
     TIME_VOICE_START = TIME_GOSIGNAL_ACTUALLYSTART + nonSpeechDelay;                   % expected voice onset time
@@ -742,7 +777,12 @@ for itrial = 1:expParams.ntrials
                 set(micLineB,'value',beepTime,'visible','on');
             end
         elseif trials.basetrial(itrial) && voiceOnsetDetected == 0,% && frameCount > onsetWindow/frameDur
-            if ~beepDetected; beepTime = 0; disp('Beep not detected. Assign beepTime = 0.'); end
+            if ~beepDetected; beepTime = 0; 
+               %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+                if show_timing_warnings
+                    disp('Beep not detected. Assign beepTime = 0.'); 
+                end
+            end
             trialData(itrial).beepTime = beepTime;
 
             % look for voice onset in previous onsetWindow
@@ -773,7 +813,10 @@ for itrial = 1:expParams.ntrials
         frameCount = frameCount+1;
 
     end
-    if trials.basetrial(itrial) && voiceOnsetDetected == 0, fprintf('warning: voice was expected but not detected (rmsThresh = %f)\n',rmsThresh); end
+    %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+    if show_timing_warnings
+        if trials.basetrial(itrial) && voiceOnsetDetected == 0, fprintf('warning: voice was expected but not detected (rmsThresh = %f)\n',rmsThresh); end
+    end
     release(deviceReader); % end recording
     
     % Hide stimulus regardless of condition
@@ -784,9 +827,12 @@ for itrial = 1:expParams.ntrials
     % end-of-trial visual stim for speech trials
     if ~trials.basetrial(itrial)
 
-        set(annoStr.GoArrow, 'Visible', 'off');  % <-- HIDE GREEN ARROW
+        set(annoStr.goArrow, 'Visible', 'off');  % <-- HIDE GREEN ARROW
         set(annoStr.Plus, 'color','r');  
         set(annoStr.Plus, 'Visible','on');
+
+       fprintf('\n ------- RED STOP GO CUE NOW ONSCREEN -------- \n\n')
+
     end
 
 
@@ -811,8 +857,11 @@ for itrial = 1:expParams.ntrials
         TIME_SCAN_ACTUALLYSTART=ManageTime('current', CLOCK);
         TIME_SCAN_END = TIME_SCAN_ACTUALLYSTART + trialData(itrial).timeScan;
         NEXTTRIAL = TIME_SCAN_END + trialData(itrial).timePreStim;
-        if ~ok, fprintf('i am late for this trial TIME_SCAN_START\n'); end
         
+        %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+        if show_timing_warnings
+            if ~ok, fprintf('i am late for this trial TIME_SCAN_START\n'); end
+        end
         if trials.basetrial(itrial); intvs = [intvs TIME_SCAN_START - TIME_GOSIGNAL_START]; expParams.timeNULL = mean(intvs); end
 
         if isnan(trialData(itrial).voiceOnsetTime)
@@ -820,7 +869,10 @@ for itrial = 1:expParams.ntrials
         else
             expdur = trialData(itrial).timePreStim + trialData(itrial).timeStim + voiceOnsetTime + trialData(itrial).timePostOnset + trialData(itrial).timeScan + 0.5;
         end
-        fprintf('\nThis trial elapsed Time: %.3f (s), expected duration: %.3f (s)\n', NEXTTRIAL - TIME_STIM_START, expdur);
+        %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+        if show_timing_warnings
+            fprintf('\nThis trial elapsed Time: %.3f (s), expected duration: %.3f (s)\n', NEXTTRIAL - TIME_STIM_START, expdur);
+        end
     else
         TIME_SCAN_ACTUALLYSTART=nan;
         %TIME_TRIG_RELEASED = nan;
