@@ -327,10 +327,11 @@ set(annoStr.Stim, 'Visible','on');
 
 %% load stim list
 % root path is where the subject description files are
-filepath = [expParams.root, filesep, sprintf('sub-%s',expParams.subject), filesep, sprintf('ses-%d',expParams.session),...
-    filesep, 'beh', filesep, expParams.task];
-unique_answers_file  = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_qa-list.tsv',expParams.subject, expParams.session, expParams.runstring, expParams.task));
-Output_name = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_desc-presentation.mat',expParams.subject, expParams.session, expParams.runstring, expParams.task));
+dirs.ses = [expParams.root, filesep, sprintf('sub-%s',expParams.subject), filesep, sprintf('ses-%d',expParams.session)];
+dirs.stim_audio = [dirs.ses, filesep, 'stim_audio']; 
+dirs.task = [dirs.ses, filesep, 'beh', filesep, expParams.task]; 
+unique_answers_file  = fullfile(dirs.task,sprintf('sub-%s_ses-%d_run-%s_task-%s_qa-list.tsv',expParams.subject, expParams.session, expParams.runstring, expParams.task));
+Output_name = fullfile(dirs.task,sprintf('sub-%s_ses-%d_run-%s_task-%s_desc-presentation.mat',expParams.subject, expParams.session, expParams.runstring, expParams.task));
 if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite',...
         questdlg(sprintf('This subject %s already has an data file for this ses-%d_run-%s (task: %s), do you want to over-write?',...
         expParams.subject, expParams.session, expParams.runstring, expParams.task),...
@@ -399,9 +400,6 @@ trials(~isbase,:) = trials_speech; % fill in speech trials
 
 
 %%
-
-% % % % % % % % % % % % % % % % stimreads=cell(size(Input_files));
-% % % % % % % % % % % % % % % % stimreads(NoNull) = cellfun(@(x)fileread(x),Input_files(NoNull),'uni',0);
 sileread = dsp.AudioFileReader(fullfile(expParams.textpath, 'silent.wav'), 'SamplesPerFrame', 2048);
 
 
@@ -668,21 +666,20 @@ for itrial = 1:expParams.ntrials
         set(annoStr.Plus, 'Visible', 'on');
         set(annoStr.Plus, 'color', 'w');  % ensure it's white
     end
-
-% if unobserved condition, and it's a speech trial, play audio question file
-if expParams.play_question_audio_stim && ~trials.basetrial(itrial)
+    
+    % if unobserved condition, and it's a speech trial, play audio question file
+    if expParams.play_question_audio_stim && ~trials.basetrial(itrial)
         % TIME_SOUND_START = TIME_STIM_ACTUALLYSTART + trialData(ii).timePreSound;
         % ok=ManageTime('wait', CLOCK, TIME_SOUND_START - stimoffset);
         % ok=ManageTime('wait', CLOCK, TIME_SOUND_START);
-        stim_q_file = [dirs.projrepo, filesep, 'stimuli', filesep,'audio', filesep, trials.stimfile{itrial}, '.mp3']; 
+        stim_q_file_extension = 'mp3';
+        stim_q_file = [dirs.stim_audio, filesep, trials.stimfile{itrial}, '.', stim_q_file_extension]; % audio file for this trial
         [Input_sound, Input_fs] = audioread(stim_q_file); 
-        % stimPlayer = audioplayer(Input_sound,Input_fs, 24, stimID);
         stimPlayer = audioplayer(Input_sound,Input_fs, 24);
         play(stimPlayer);
         % sttInd=1; endMax=size(Input_sound, 1); while sttInd<endMax; headwrite(Input_sound(sttInd:min(sttInd+2047, endMax))); sttInd=sttInd+2048; end; reset(headwrite);
         TIME_SOUND_ACTUALLYSTART = ManageTime('current', CLOCK);
         % while ~isDone(stimread); sound=stimread();headwrite(sound);end;release(stimread);reset(headwrite);
-        %%% add code here to display the text files
         TIME_SOUND_END = TIME_SOUND_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
         if ~ok, fprintf('i am late for this trial TIME_SOUND_START\n'); end
     end
@@ -851,7 +848,7 @@ if expParams.play_question_audio_stim && ~trials.basetrial(itrial)
 
     % fName_trial will be used for individual trial files (which will
     % live in the run folder)
-    fName_trial = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%s_task-%s_trial-%d.mat',expParams.subject, expParams.session, expParams.runstring, expParams.task,itrial));
+    fName_trial = fullfile(dirs.task,sprintf('sub-%s_ses-%d_run-%s_task-%s_trial-%d.mat',expParams.subject, expParams.session, expParams.runstring, expParams.task,itrial));
     save(fName_trial,'tData');
 end
 
