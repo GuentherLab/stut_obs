@@ -66,8 +66,7 @@ num_run_digits = 2; % number of digits to include in run number labels in filena
 
 
 % wait for 4.5 seconds and if they don't speak cut the trial short.
-% current prestim is very very low. Increase it
-% change expParams to be stored values.
+
 
 ET = tic;
 [dirs, host] = set_paths_stut_obs(); % set project paths and get computer name
@@ -123,15 +122,15 @@ else % if no preset config file defined
         'subject','sub-example',...
         'session', 1, ...
         'run', 1,...
-        'task', 'jackson20', ...
         'scan', true, ...
+        'play_question_audio_stim',false,... % play (unobserved condition) or don't play (observed condition) the audio quesiton stim
         'repetitions_per_unique_qa', 1, ...
         'shuffle_qa_order', true, ... % specifically affects stim order, not baseline trials
-        'max_unique_qa_repeats',3, ... % max consecutive repeats of a given QA stim, before baseline trials are mixed in
+        'max_unique_qa_repeats',2, ... % max consecutive repeats of a given QA stim, before baseline trials are mixed in
         'baseline_trials_proportion',0.5,... % proportion of all trials that are baseline trials
         'baseline_trials_evenly_spaced',true,.... % whether baseline trals are evenly spaced or shuffled
-        'max_basetrial_repeats',3,... % don't let there be more than this many no-speech trials in row
-        'play_question_audio_stim',false,... % play (unobserved condition) or don't play (observed condition) the audio quesiton stim
+        'max_basetrial_repeats',2,... % don't let there be more than this many no-speech trials in row
+        'cover_camera_when_nospeech',true, ... % cover the left side of screen w/ figure where camera is outside of speech epochs
         'show_question_orthography', false, ...
         'timeStim', [2 2.5],...
         'timePostOnset', 3.5,...
@@ -152,7 +151,8 @@ else % if no preset config file defined
         'deviceScan','', ...
         'rectWidthProp', 0.8, ...      % rectangle width as proportion of screen width
         'rectHeightProp', 0.6, ...     % rectangle height as proportion of screen height  
-        'rectColor', [0 1 0] ...      % RGB color of rectangle [R G B] (0-1 scale)
+        'rectColor', [0 1 0], ...      % RGB color of rectangle [R G B] (0-1 scale)
+        'task', 'jackson20' ...
         );
 end
 
@@ -186,12 +186,12 @@ tgind = find(contains(strOUTPUT, 'Playback')&contains(strOUTPUT, 'Focusrite'));
 
 % GUI for user to modify options
 fnames=fieldnames(expParams);
-fnames=fnames(~ismember(fnames,{'root','subject', 'session', 'run', 'task',...
+fnames=fnames(~ismember(fnames,{'root','subject', 'session', 'run','play_question_audio_stim',...
     'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats',...
     'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
-    'play_question_audio_stim','show_question_orthography', ...
+    'cover_camera_when_nospeech','show_question_orthography', ...
     'timeStim','timePostOnset', 'timePreStim','timeMax','timeNoOnset', 'timeScan',...
-    'scan', 'deviceMic','deviceHead','deviceScan'}));
+    'scan', 'deviceMic','deviceHead','deviceScan','task'}));
 for n=1:numel(fnames)
     val=expParams.(fnames{n});
     if ischar(val), fvals{n}=val;
@@ -201,12 +201,12 @@ for n=1:numel(fnames)
 end
 
 
-out_dropbox = {'root',  'subject', 'session', 'run', 'task',...
+out_dropbox = {'root','subject', 'session', 'run','play_question_audio_stim',...
     'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats',...
     'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
-    'play_question_audio_stim','show_question_orthography', ...
+    'cover_camera_when_nospeech','show_question_orthography', ...
     'timeStim','timePostOnset', 'timePreStim','timeMax','timeNoOnset', 'timeScan',...
-    'scan', 'deviceMic','deviceHead','deviceScan'};
+    'scan', 'deviceMic','deviceHead','deviceScan','task'};
 for n=1:numel(out_dropbox)
     val=expParams.(out_dropbox{n});
     if ischar(val), fvals_o{n}=val;
@@ -315,10 +315,22 @@ end
 expParams.runstring = sprintf(['%0',num2str(num_run_digits),'d'], expParams.run); % add zero padding
 
 % visual setup
+expParams.fig_background_color = [0 0 0];
 anno_op.rectWidthProp = expParams.rectWidthProp;
 anno_op.rectHeightProp = expParams.rectHeightProp;
 anno_op.rectColor = expParams.rectColor; 
-annoStr = setUpVisAnnot_HW([0 0 0], anno_op);
+annoStr = setUpVisAnnot_HW(expParams.fig_background_color, anno_op);
+
+% add figure to cover camera
+% set position to fill in the screen where the camera feed is, to the left of the main stim figure
+cam_blocker_x = annoStr.monitorSize(1);         % far left on stim screen
+cam_blocker_width = annoStr.monitorSize(3) - annoStr.figPosition(3);
+winPos = [cam_blocker_x, annoStr.figPosition(2), cam_blocker_width,  annoStr.figPosition(4)]; % left,bottom,w,h
+hfig_cam_blocker = figure('Visible','off','NumberTitle', 'off', 'Color', expParams.fig_background_color,...
+    'Position', winPos, 'MenuBar', 'none', 'ToolBar','none');
+if expParams.cover_camera_when_nospeech
+    hfig_cam_blocker.Visible = 'on'; % block camera window with empty figure
+end
 
 CLOCKp = ManageTime('start');
 TIME_PREPARE = 0.5; % Waiting period before experiment begin (sec)
@@ -399,10 +411,6 @@ end
 trials = table; 
 trials(isbase,:) = repmat(baserow, expParams.n_base_trials, 1); % fill in baseline trials
 trials(~isbase,:) = trials_speech; % fill in speech trials
-
-
-
-
 
 
 %%
@@ -585,9 +593,6 @@ intvs = [];
 %% LOOP OVER TRIALS
 for itrial = 1:expParams.ntrials
 
-    % % % % % % % % % % % % % % % % % % fprintf('\nRun %s, trial %d/%d\n', expParams.runstring, itrial, expParams.ntrials);
-    set(annoStr.Plus, 'Visible','on');
-
     % trial specific timing parameters with jitter on
     trialData(itrial).question = trials.question{itrial};
     if strcmp(trials.question{itrial}, 'NULL'); 
@@ -613,16 +618,24 @@ for itrial = 1:expParams.ntrials
 
     if trials.basetrial(itrial)
         experimenter_cue_string = '(BASELINE TRIAL - NO QUESTION)'; 
+       if expParams.cover_camera_when_nospeech
+            cam_blocker_state = 'on'; % block camera if it's a basetrial and if the blocker is enabled
+       elseif ~expParams.cover_camera_when_nospeech
+            cam_blocker_state = 'off'; 
+       end        
     elseif ~trials.basetrial(itrial)
        experimenter_cue_string = trials.question{itrial};
+       cam_blocker_state = 'off'; % always show camera on speech trials
     end
+
+    % block camera if it's a basetrial and if the blocker is enabled
+    hfig_cam_blocker.Visible = cam_blocker_state; 
 
     fprintf(['\n', experimenter_cue_string, ' ........ trial ', num2str(itrial), '/' num2str(expParams.ntrials), ...
         '\n      [[[[''',trials.answer{itrial}, ''']]]]',...
         '\n\n'     , ...
         next_trial_string,...
         '\n']);
-
 
     prepareScan=0.250*(expParams.scan~=0); % if scanning, end recording 250ms before scan trigger
     % set up variables for audio recording and voice detection
@@ -700,17 +713,17 @@ for itrial = 1:expParams.ntrials
         TIME_SOUND_END = TIME_SOUND_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
 
         %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
-        % if show_timing_warnings
-        %     if ~ok, fprintf('i am late for this trial TIME_SOUND_START\n'); end
-        % end
+        if show_timing_warnings
+            if ~ok, fprintf('i am late for this trial TIME_SOUND_START\n'); end
+        end
     end
 
     TIME_TEXT_END = TIME_TEXT_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
 
     %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
-    % if show_timing_warnings
-    %     if ~ok, fprintf('i am late for this trial TIME_TEXT_END\n'); end
-    % end
+    if show_timing_warnings
+        if ~ok, fprintf('i am late for this trial TIME_TEXT_END\n'); end
+    end
     TIME_GOSIGNAL_START = TIME_TEXT_END;          % GO signal time
     set(micLine,'visible','off');set(micLineB,'visible','off');drawnow;
         
@@ -836,9 +849,6 @@ for itrial = 1:expParams.ntrials
     end
 
 
-    
-
-          
     %% save voice onset time and determine how much time left before sending trigger to scanner
     if voiceOnsetDetected == 0 %if voice onset wasn't detected
         trialData(itrial).onsetDetected = 0;
@@ -880,7 +890,6 @@ for itrial = 1:expParams.ntrials
         NEXTTRIAL = TIME_SCAN_START + trialData(itrial).timePreStim;
     end
 
-        
     trialData(itrial).timingTrial = [TIME_TRIAL_START;TIME_TEXT_ACTUALLYSTART;TIME_TEXT_END;TIME_GOSIGNAL_START;TIME_GOSIGNAL_ACTUALLYSTART;TIME_VOICE_START;TIME_SCAN_START;TIME_SCAN_ACTUALLYSTART;TIME_SCAN_END];
     expParams.timingTrialNames = split('TIME_TRIAL_START;TIME_TEXT_ACTUALLYSTART;TIME_TEXT_END;TIME_GOSIGNAL_START;TIME_GOSIGNAL_ACTUALLYSTART;TIME_VOICE_START;TIME_SCAN_START:TIME_SCAN_ACTUALLYSTART;TIME_SCAN_END;');
     

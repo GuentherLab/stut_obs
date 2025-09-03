@@ -11,6 +11,7 @@
     "baseline_trials_proportion" : 0.5,
     "baseline_trials_evenly_spaced" : false, 
     "max_basetrial_repeats" : 3, 
+    "cover_camera_when_nospeech" : true,
     "play_question_audio_stim" : false, 
     "show_question_orthography": false,
     "scan": true,

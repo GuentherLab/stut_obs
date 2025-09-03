@@ -15,26 +15,23 @@ numMon = size(monitorSize, 1);
 
 if numMon == 2
     % For dual monitor, still use second monitor but only right half
-    W = monitorSize(2,3);
-    H = monitorSize(2,4);
-    XPos = monitorSize(2,1) + W/2;  % Start at middle of second monitor
+    annoStr.fig_width = monitorSize(2,3);
+    annoStr.fig_height = monitorSize(2,4);
+    XPos = monitorSize(2,1) + annoStr.fig_width/2;  % Start at middle of second monitor
     YPos = monitorSize(2,2);
-    figPosition = [XPos YPos W/2 H];  % Right half width, full height
+    annoStr.figPosition = [XPos YPos annoStr.fig_width/2 annoStr.fig_height];  % Right half width, full height
+    annoStr.monitorSize = monitorSize(2,:);
 else
     % For single monitor, use right half
-    W = monitorSize(1, 3);
-    H = monitorSize(1, 4);
-    XPos = W/2;  % Start at middle of screen
+    annoStr.fig_width = monitorSize(1, 3);
+    annoStr.fig_height = monitorSize(1, 4);
+    XPos = annoStr.fig_width/2;  % Start at middle of screen
     YPos = 0;    % Start at bottom
-    figPosition = [XPos YPos W/2 H];  % Right half width, full height
+    annoStr.figPosition = [XPos YPos annoStr.fig_width/2 annoStr.fig_height];  % Right half width, full height
+    annoStr.monitorSize = monitorSize(1,:);
 end
 
-winPos = figPosition;
-
-
-
-
-
+winPos = annoStr.figPosition;
 
 %% Preparing 'Ready' Annotation Position
 rdAnoD = [0.7 0.3];
@@ -51,10 +48,10 @@ stimAnoPos = getPos(stimAnoD, winPos);
 
 %% Actually create the stim presentation figure
 % this causes the stim window to appear
-VBFig = figure('NumberTitle', 'off', 'Color', bg, 'Position', winPos, 'MenuBar', 'none', 'ToolBar','none');
+annoStr.hfig = figure('NumberTitle', 'off', 'Color', bg, 'Position', winPos, 'MenuBar', 'none', 'ToolBar','none');
 drawnow; 
 if ~HW_testing
-    if ~isequal(get(VBFig,'position'),winPos), set(VBFig,'Position',winPos, 'MenuBar', 'none', 'ToolBar', 'none'); end % fix needed only on some dual monitor setups
+    if ~isequal(get(annoStr.hfig,'position'),winPos), set(annoStr.hfig,'Position',winPos, 'MenuBar', 'none', 'ToolBar', 'none'); end % fix needed only on some dual monitor setups
 end
 
 % Common annotation settings
@@ -71,18 +68,18 @@ cSettings = {'Color',txt,...
     'visible','off'};
 
 % Ready annotation
-annoStr.Ready = annotation(VBFig,'textbox', rdAnoPos,...
+annoStr.Ready = annotation(annoStr.hfig,'textbox', rdAnoPos,...
     'String',{'READY'},...
     cSettings{:});
 
 % Cue annotation
-annoStr.Plus = annotation(VBFig,'textbox', cuAnoPos,...
+annoStr.Plus = annotation(annoStr.hfig,'textbox', cuAnoPos,...
     'String',{'+'},...
     cSettings{:});
 set(annoStr.Plus, 'FontSize', 200);
 
 % GO arrow
-annoStr.goArrow = annotation(VBFig,'arrow',...
+annoStr.goArrow = annotation(annoStr.hfig,'arrow',...
     'X',[0.7 0.1], 'Y',[0.5 0.5],...
     'HeadStyle', 'plain',...
     'HeadSize', 100,...
@@ -92,11 +89,11 @@ annoStr.goArrow = annotation(VBFig,'arrow',...
     );
 
 % Stim orthography annotation
-annoStr.Stim = annotation(VBFig,'textbox', stimAnoPos,...
+annoStr.Stim = annotation(annoStr.hfig,'textbox', stimAnoPos,...
     'String',{'stim'},...
     cSettings{:});
 
-annoStr.Pic = axes(VBFig, 'pos',[1/2-winPos(4)/(4*winPos(3)) 0.25 winPos(4)/(2*winPos(3)) 0.5]);
+annoStr.Pic = axes(annoStr.hfig, 'pos',[1/2-winPos(4)/(4*winPos(3)) 0.25 winPos(4)/(2*winPos(3)) 0.5]);
 axes(annoStr.Pic)
 imshow([])
 drawnow
@@ -106,7 +103,7 @@ rectX = (1 - op.rectWidthProp) / 2;     % center horizontally
 rectY = (1 - op.rectHeightProp) / 2;    % center vertically
 
 % Create rectangle using the calculated proportions
-annoStr.GoRect = annotation(VBFig, 'rectangle', [rectX, rectY, op.rectWidthProp, op.rectHeightProp], ...
+annoStr.GoRect = annotation(annoStr.hfig, 'rectangle', [rectX, rectY, op.rectWidthProp, op.rectHeightProp], ...
                            'FaceColor', op.rectColor, ...
                            'EdgeColor', 'none', ...
                            'Visible', 'off');
