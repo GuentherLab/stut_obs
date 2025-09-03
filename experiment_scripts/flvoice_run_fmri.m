@@ -1,4 +1,4 @@
-function flvoice_run(varargin)
+function flvoice_run_fmri(varargin)
 close all;
 
 CMRR = true;
