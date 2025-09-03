@@ -314,28 +314,39 @@ for n=1:numel(out_dropbox)
 end
 expParams.runstring = sprintf(['%0',num2str(num_run_digits),'d'], expParams.run); % add zero padding
 
-% visual setup
+%% visual stimulus figure setup
 expParams.fig_background_color = [0 0 0];
 anno_op.rectWidthProp = expParams.rectWidthProp;
 anno_op.rectHeightProp = expParams.rectHeightProp;
 anno_op.rectColor = expParams.rectColor; 
-annoStr = setUpVisAnnot_HW(expParams.fig_background_color, anno_op);
+anno_stim = setUpVisAnnot_HW(expParams.fig_background_color, anno_op);
+
+CLOCKp = ManageTime('start');
+TIME_PREPARE = 0.5; % Waiting period before experiment begin (sec)
+set(anno_stim.Stim, 'String', 'Preparing...');
+set(anno_stim.Stim, 'Visible','on');
 
 % add figure to cover camera
 % set position to fill in the screen where the camera feed is, to the left of the main stim figure
-cam_blocker_x = annoStr.monitorSize(1);         % far left on stim screen
-cam_blocker_width = annoStr.monitorSize(3) - annoStr.figPosition(3);
-winPos = [cam_blocker_x, annoStr.figPosition(2), cam_blocker_width,  annoStr.figPosition(4)]; % left,bottom,w,h
+cam_blocker_x = anno_stim.monitorSize(1);         % far left on stim screen
+cam_blocker_width = anno_stim.monitorSize(3) - anno_stim.figPosition(3);
+winPos = [cam_blocker_x, anno_stim.figPosition(2), cam_blocker_width,  anno_stim.figPosition(4)]; % left,bottom,w,h
 hfig_cam_blocker = figure('Visible','off','NumberTitle', 'off', 'Color', expParams.fig_background_color,...
     'Position', winPos, 'MenuBar', 'none', 'ToolBar','none');
 if expParams.cover_camera_when_nospeech
     hfig_cam_blocker.Visible = 'on'; % block camera window with empty figure
 end
 
-CLOCKp = ManageTime('start');
-TIME_PREPARE = 0.5; % Waiting period before experiment begin (sec)
-set(annoStr.Stim, 'String', 'Preparing...');
-set(annoStr.Stim, 'Visible','on');
+% make figure for displaying questions for question-asker (investigator); put on first monitor 
+anno_op.visible = 'off'; % start invisible before moving into place
+anno_qustnr = setUpVisAnnot_HW(expParams.fig_background_color, anno_op);
+monitorSize = get(0, 'Monitor');
+fig_width = monitorSize(1,3) / 2; % Start at middle of first monitor
+fig_height = monitorSize(1,4) * 0.7;
+XPos = monitorSize(1,3) / 2;  %
+YPos = monitorSize(1,4) * 0.3;
+winPos = [XPos YPos fig_width fig_height]; % left,bottom,w,h
+anno_qustnr.Position = winpos;      anno_op.visible = 'on'; % move into place and turn visible
 
 %%%%%%%% only turn on timing warnings on commandline for debugging or in unobserved condition; otherwise is distracting for experimenter
 show_timing_warnings = expParams.play_question_audio_stim; % 'play_question_audio_stim' is true only in unobserved condition
@@ -574,18 +585,18 @@ trialData = struct;
 
 % waits for TIME_PREPARE set to 0.5seconds
 ok=ManageTime('wait', CLOCKp, TIME_PREPARE);
-set(annoStr.Stim, 'Visible','off');     % Turn off preparation page
+set(anno_stim.Stim, 'Visible','off');     % Turn off preparation page
 
 % gets current time
 TIME_PREPARE_END=ManageTime('current', CLOCKp);
 
-set(annoStr.Stim, 'String', 'READY');
-set(annoStr.Stim, 'Visible','on');
+set(anno_stim.Stim, 'String', 'READY');
+set(anno_stim.Stim, 'Visible','on');
 
 while ~isDone(sileread); sound=sileread();headwrite(sound);end;release(sileread);reset(headwrite);
 
 ok=ManageTime('wait', CLOCKp, TIME_PREPARE_END+2);
-set(annoStr.Stim, 'Visible','off');     % Turn off preparation page
+set(anno_stim.Stim, 'Visible','off');     % Turn off preparation page
 CLOCK=[];                               % Main clock (not yet started)
 expParams.timeNULL = expParams.timeMax(1) + diff(expParams.timeMax).*rand;
 intvs = [];
@@ -627,6 +638,11 @@ for itrial = 1:expParams.ntrials
        experimenter_cue_string = trials.question{itrial};
        cam_blocker_state = 'off'; % always show camera on speech trials
     end
+
+    % show question orthography in questioner figure
+    set(anno_qustnr.Stim, 'String', experimenter_cue_string);
+    set(anno_qustnr.Stim, 'Visible', 'On');
+
 
     % block camera if it's a basetrial and if the blocker is enabled
     hfig_cam_blocker.Visible = cam_blocker_state; 
@@ -673,28 +689,28 @@ for itrial = 1:expParams.ntrials
     
 
 
-    %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+    %%%%%%%% timing warnings
     if show_timing_warnings
         if ~ok, fprintf('i am late for this trial TIME_TRIAL_START\n'); end
     end
     
     
-    set(annoStr.Plus, 'Visible','off');        
-    set(annoStr.Stim, 'color', 'w');
+    set(anno_stim.Plus, 'Visible','off');        
+    set(anno_stim.Stim, 'color', 'w');
     
     % determine what to display
     if expParams.show_question_orthography
         % Display the orthography stimulus as normal
-        set(annoStr.Stim, 'String', stimread);
-        set(annoStr.Stim, 'Visible', 'On');
+        set(anno_stim.Stim, 'String', stimread);
+        set(anno_stim.Stim, 'Visible', 'On');
     elseif ~expParams.show_question_orthography
         % Keep the white fixation cross visible (don't change it)
         % The fixation cross should already be visible from before
         % Just make sure the stimulus text is not shown
-        set(annoStr.Stim, 'Visible', 'Off');
+        set(anno_stim.Stim, 'Visible', 'Off');
         % Keep the Plus (fixation cross) visible
-        set(annoStr.Plus, 'Visible', 'on');
-        set(annoStr.Plus, 'color', 'w');  % ensure it's white
+        set(anno_stim.Plus, 'Visible', 'on');
+        set(anno_stim.Plus, 'color', 'w');  % ensure it's white
     end
     
     % if unobserved condition, and it's a speech trial, play audio question file
@@ -712,7 +728,7 @@ for itrial = 1:expParams.ntrials
         % while ~isDone(stimread); sound=stimread();headwrite(sound);end;release(stimread);reset(headwrite);
         TIME_SOUND_END = TIME_SOUND_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
 
-        %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+        %%%%%%%% timing warnings
         if show_timing_warnings
             if ~ok, fprintf('i am late for this trial TIME_SOUND_START\n'); end
         end
@@ -720,7 +736,7 @@ for itrial = 1:expParams.ntrials
 
     TIME_TEXT_END = TIME_TEXT_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
 
-    %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+    %%%%%%%% timing warnings
     if show_timing_warnings
         if ~ok, fprintf('i am late for this trial TIME_TEXT_END\n'); end
     end
@@ -730,7 +746,7 @@ for itrial = 1:expParams.ntrials
     ok=ManageTime('wait', CLOCK, TIME_GOSIGNAL_START - beepoffset);     % waits for recorder initialization time
     [nill, nill] = deviceReader(); % note: this line may take some random initialization time to run; audio signal start (t=0) will be synchronized to the time when this line finishes running
     
-    %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+    %%%%%%%% timing warnings
     if show_timing_warnings
         if ~ok, fprintf('i am late for this trial TIME_GOSIGNAL_START - beepoffset\n'); end
     end
@@ -740,9 +756,15 @@ for itrial = 1:expParams.ntrials
     if ~trials.basetrial(itrial)
         % GO signal goes with beep
         while ~isDone(beepread); sound=beepread();headwrite(sound);end;reset(beepread);reset(headwrite);
-        set(annoStr.Plus, 'Visible','off'); % remove fixcross
-        set(annoStr.Stim, 'Visible','off'); % remove stim question orthography if it's there (unobserved condition)
-        set(annoStr.goArrow, 'Visible', 'on');  % <-- SHOW GREEN ARROW
+        set(anno_stim.Plus, 'Visible','off'); % remove fixcross
+        set(anno_stim.Stim, 'Visible','off'); % remove stim question orthography if it's there (unobserved condition)
+        set(anno_stim.goArrow, 'Visible', 'on');  % <-- SHOW GREEN ARROW
+
+        % show go cue in questioner figure to indicate to look at the camera
+        set(anno_qustnr.Plus, 'Visible','off'); % remove fixcross
+        set(anno_qustnr.Stim, 'Visible','off'); % remove stim question orthography if it's there
+        set(anno_stim.Rect, 'Visible', 'on');  % <-- show go cue
+
     end
 
     TIME_GOSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK); % actual time for GO signal 
@@ -751,7 +773,7 @@ for itrial = 1:expParams.ntrials
        fprintf('\n ------- GREEN GO CUE NOW ONSCREEN, PLAYING BEEP --------\n\n')
     end
 
-    %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+    %%%%%%%% timing warnings  
     if show_timing_warnings
         if ~ok, fprintf('i am late for this trial TIME_GOSIGNAL_START\n'); end
     end
@@ -791,7 +813,7 @@ for itrial = 1:expParams.ntrials
             end
         elseif trials.basetrial(itrial) && voiceOnsetDetected == 0,% && frameCount > onsetWindow/frameDur
             if ~beepDetected; beepTime = 0; 
-               %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+               %%%%%%%% timing warnings
                 if show_timing_warnings
                     disp('Beep not detected. Assign beepTime = 0.'); 
                 end
@@ -826,23 +848,27 @@ for itrial = 1:expParams.ntrials
         frameCount = frameCount+1;
 
     end
-    %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+    %%%%%%%% timing warnings
     if show_timing_warnings
         if trials.basetrial(itrial) && voiceOnsetDetected == 0, fprintf('warning: voice was expected but not detected (rmsThresh = %f)\n',rmsThresh); end
     end
     release(deviceReader); % end recording
     
     % Hide stimulus regardless of condition
-    set(annoStr.Stim, 'color','w');
-    set(annoStr.Stim, 'Visible','off');
+    set(anno_stim.Stim, 'color','w');
+    set(anno_stim.Stim, 'Visible','off');
 
 
     % end-of-trial visual stim for speech trials
     if ~trials.basetrial(itrial)
 
-        set(annoStr.goArrow, 'Visible', 'off');  % <-- HIDE GREEN ARROW
-        set(annoStr.Plus, 'color','r');  
-        set(annoStr.Plus, 'Visible','on');
+        set(anno_stim.goArrow, 'Visible', 'off');  % <-- HIDE GREEN ARROW
+        set(anno_stim.Plus, 'color','r');  
+        set(anno_stim.Plus, 'Visible','on');
+
+        set(anno_qustnr.goRect, 'Visible', 'off');  % <-- hide go cue
+        set(anno_qustnr.Plus, 'color','r');  
+        set(anno_qustnr.Plus, 'Visible','on');
 
        fprintf('\n ------- RED STOP GO CUE NOW ONSCREEN -------- \n\n')
 
@@ -868,7 +894,7 @@ for itrial = 1:expParams.ntrials
         TIME_SCAN_END = TIME_SCAN_ACTUALLYSTART + trialData(itrial).timeScan;
         NEXTTRIAL = TIME_SCAN_END + trialData(itrial).timePreStim;
         
-        %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+        %%%%%%%% timing warnings
         if show_timing_warnings
             if ~ok, fprintf('i am late for this trial TIME_SCAN_START\n'); end
         end
@@ -879,7 +905,7 @@ for itrial = 1:expParams.ntrials
         else
             expdur = trialData(itrial).timePreStim + trialData(itrial).timeStim + voiceOnsetTime + trialData(itrial).timePostOnset + trialData(itrial).timeScan + 0.5;
         end
-        %%%%%%%% only turn on below output for debugging or in unobserved condition; otherwise is distracting for experimenter
+        %%%%%%%% timing warnings
         if show_timing_warnings
             fprintf('\nThis trial elapsed Time: %.3f (s), expected duration: %.3f (s)\n', NEXTTRIAL - TIME_STIM_START, expdur);
         end

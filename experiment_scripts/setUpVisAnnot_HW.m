@@ -6,28 +6,35 @@ function annoStr = setUpVisAnnot_HW(bg, op)
 
 HW_testing = false;
 
+field_default('anno_op','visible',1); % start visible by default
+field_default('anno_op', 'rectWidthProp', 0.8);      % rectangle width as proportion of screen width
+field_default('anno_op', 'rectHeightProp', 0.6);     % rectangle height as proportion of screen height  
+field_default('anno_op', 'rectColor', [0 1 0]);      % RGB color of rectangle [R G B] (0-1 scale)
+
+
+
 if nargin<1||isempty(bg), bg = [0 0 0]; end
 txt = 1 - bg;
 
 %% get monitorSize and set up related var
 monitorSize = get(0, 'Monitor');
-numMon = size(monitorSize, 1);
+annoStr.numMonitors = size(monitorSize, 1);
 
-if numMon == 2
+if annoStr.numMonitors == 2
     % For dual monitor, still use second monitor but only right half
-    annoStr.fig_width = monitorSize(2,3);
+    annoStr.fig_width = monitorSize(2,3) / 2; % Start at middle of second monitor
     annoStr.fig_height = monitorSize(2,4);
-    XPos = monitorSize(2,1) + annoStr.fig_width/2;  % Start at middle of second monitor
+    XPos = monitorSize(2,1) + annoStr.fig_width;  
     YPos = monitorSize(2,2);
-    annoStr.figPosition = [XPos YPos annoStr.fig_width/2 annoStr.fig_height];  % Right half width, full height
+    annoStr.figPosition = [XPos YPos annoStr.fig_width annoStr.fig_height];  % Right half width, full height
     annoStr.monitorSize = monitorSize(2,:);
 else
     % For single monitor, use right half
-    annoStr.fig_width = monitorSize(1, 3);
+    annoStr.fig_width = monitorSize(1, 3) / 2; % Start at middle of screen
     annoStr.fig_height = monitorSize(1, 4);
-    XPos = annoStr.fig_width/2;  % Start at middle of screen
+    XPos = annoStr.fig_width;  
     YPos = 0;    % Start at bottom
-    annoStr.figPosition = [XPos YPos annoStr.fig_width/2 annoStr.fig_height];  % Right half width, full height
+    annoStr.figPosition = [XPos YPos annoStr.fig_width annoStr.fig_height];  % Right half width, full height
     annoStr.monitorSize = monitorSize(1,:);
 end
 
@@ -48,7 +55,7 @@ stimAnoPos = getPos(stimAnoD, winPos);
 
 %% Actually create the stim presentation figure
 % this causes the stim window to appear
-annoStr.hfig = figure('NumberTitle', 'off', 'Color', bg, 'Position', winPos, 'MenuBar', 'none', 'ToolBar','none');
+annoStr.hfig = figure('Visible',op.visible, 'NumberTitle', 'off', 'Color', bg, 'Position', winPos, 'MenuBar', 'none', 'ToolBar','none');
 drawnow; 
 if ~HW_testing
     if ~isequal(get(annoStr.hfig,'position'),winPos), set(annoStr.hfig,'Position',winPos, 'MenuBar', 'none', 'ToolBar', 'none'); end % fix needed only on some dual monitor setups
