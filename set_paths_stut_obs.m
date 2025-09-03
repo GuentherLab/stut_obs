@@ -50,7 +50,13 @@ else % analyzing on a local machine
             dirs.spm = [pkgdir filesep 'spm12'];
             dirs.conn = [pkgdir filesep 'conn'];
             dirs.data = ['C:\ieeg_stut'];  % source data
-           
+        
+        case {'samhansen'}
+            dirs.data = ['/Users/samhansen/Documents/MATLAB/Guenther/data/ieeg_stut'];
+            dirs.projrepo = ['/Users/samhansen/Documents/MATLAB/Guenther/stut_obs'];
+            %%dirs.spm = [pkgdir filesep 'spm12']; ADD
+            %%dirs.conn = [pkgdir filesep 'conn']; ADD
+
         otherwise
             disp('Directory listings are not set up for this computer. Please check that your hostname is correct.');
             return
