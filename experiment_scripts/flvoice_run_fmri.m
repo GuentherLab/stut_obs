@@ -1,10 +1,27 @@
-function flvoice_run(varargin)
+function flvoice_run_fmri(varargin)
 close all;
+
+% Resolve script directory for relative files (config, wavs, etc.)
+SCRIPT_DIR = fileparts(mfilename('fullpath'));
+
+% Default root per-OS (Windows path in your code breaks on macOS)
+if ispc
+    default_root = 'C:\ieeg_stut';
+else
+    default_root = fullfile(getenv('HOME'), 'ieeg_stut');
+end
+
 
 CMRR = true;
 
 % set priority for matlab to high for running experiments
-system(sprintf('wmic process where processid=%d call setpriority "high priority"', feature('getpid')));
+pid = feature('getpid');
+if ispc
+    system(sprintf('wmic process where processid=%d call setpriority "high priority"', pid));
+else
+    % Best effort on macOS/Linux; ignore if not permitted
+    system(sprintf('renice -n -5 -p %d >/dev/null 2>&1', pid));
+end
 
 beepoffset = 0.100;
 num_run_digits = 2; % number of digits to include in run number labels in filenames
@@ -71,6 +88,10 @@ num_run_digits = 2; % number of digits to include in run number labels in filena
 
 ET = tic;
 [dirs, host] = set_paths_stut_obs(); % set project paths and get computer name
+% Use helper function outputs to prefill defaults shown in the GUI
+default_root = dirs.data;
+default_audio_common = fullfile(dirs.stim,'audio');   % <- uses dirs.stim (not projrepo)
+default_config_dir = dirs.config;                     % used by the file picker
 
 default_fontsize = 12;
 
@@ -90,25 +111,19 @@ ok=ishandle(presfig);
 if ~ok, return; end
 
 % gets json files
-function preCall1(varargin)
-    [fileName, filePath] = uigetfile('./config/*.json', 'Select .json file');
-    fileFull = [filePath fileName];
-    if isequal(fileName,0)
-        return
-    else
-        set(prePath, 'String', fileFull);
-    end
+function preCall1(~,~)
+    [fileName, filePath] = uigetfile(fullfile(default_config_dir,'*.json'), 'Select .json file');
+    if isequal(fileName,0), return; end
+    set(prePath, 'String', fullfile(filePath, fileName));
 end
 
 % checks if file paths exist
 function preCall2(varargin)
-    path = get(prePath, 'String');
-    assert(~isempty(dir(path)), 'unable to find input file %s',path);
-    if ~isempty(dir(path))
-        expRead=spm_jsonread(path);
-        uiresume;
-        preFlag = true;
-    end
+    cfgPath = get(prePath, 'String');
+    assert(exist(cfgPath,'file')==2, 'unable to find input file %s', cfgPath);
+    expRead = spm_jsonread(cfgPath);
+    preFlag = true;
+    uiresume;
 end
 
 delete(presfig);
@@ -123,15 +138,15 @@ else % if no preset config file defined
         'subject','sub-example',...
         'session', 1, ...
         'run', 1,...
-        'task', 'jackson20', ...
         'scan', true, ...
+        'play_question_audio_stim',false,... % play (unobserved condition) or don't play (observed condition) the audio quesiton stim
         'repetitions_per_unique_qa', 1, ...
         'shuffle_qa_order', true, ... % specifically affects stim order, not baseline trials
-        'max_unique_qa_repeats',3, ... % max consecutive repeats of a given QA stim, before baseline trials are mixed in
+        'max_unique_qa_repeats',2, ... % max consecutive repeats of a given QA stim, before baseline trials are mixed in
         'baseline_trials_proportion',0.5,... % proportion of all trials that are baseline trials
         'baseline_trials_evenly_spaced',true,.... % whether baseline trals are evenly spaced or shuffled
-        'max_basetrial_repeats',3,... % don't let there be more than this many no-speech trials in row
-        'play_question_audio_stim',false,... % play (unobserved condition) or don't play (observed condition) the audio quesiton stim
+        'max_basetrial_repeats',2,... % don't let there be more than this many no-speech trials in row
+        'cover_camera_when_nospeech',true, ... % cover the left side of screen w/ figure where camera is outside of speech epochs
         'show_question_orthography', false, ...
         'timeStim', [2 2.5],...
         'timePostOnset', 3.5,...
@@ -152,8 +167,46 @@ else % if no preset config file defined
         'deviceScan','', ...
         'rectWidthProp', 0.8, ...      % rectangle width as proportion of screen width
         'rectHeightProp', 0.6, ...     % rectangle height as proportion of screen height  
-        'rectColor', [0 1 0] ...      % RGB color of rectangle [R G B] (0-1 scale)
+        'rectColor', [0 1 0], ...      % RGB color of rectangle [R G B] (0-1 scale)
+        'task', 'jackson20' ...
         );
+        % Fill in remaining directory defaults from dirs
+        expParams.config    = dirs.config;
+        expParams.stim      = dirs.stim;
+        expParams.projrepo  = dirs.projrepo;
+        expParams.deriv     = dirs.derivatives;
+end
+
+% --- Backfill any fields missing from older JSON presets (must be before GUI lists) ---
+if ~isfield(expParams,'cover_camera_when_nospeech'), expParams.cover_camera_when_nospeech = true;  end
+if ~isfield(expParams,'play_question_audio_stim'),   expParams.play_question_audio_stim   = false; end
+if ~isfield(expParams,'show_question_orthography'),  expParams.show_question_orthography  = false; end
+
+% visual sizing/colors in case JSON lacks them
+if ~isfield(expParams,'rectWidthProp'),  expParams.rectWidthProp  = 0.8;    end
+if ~isfield(expParams,'rectHeightProp'), expParams.rectHeightProp = 0.6;    end
+if ~isfield(expParams,'rectColor'),      expParams.rectColor      = [0 1 0];end
+
+% device fields (keep as empty strings if unknown)
+if ~isfield(expParams,'deviceMic'),  expParams.deviceMic  = ''; end
+if ~isfield(expParams,'deviceHead'), expParams.deviceHead = ''; end
+if ~isfield(expParams,'deviceScan'), expParams.deviceScan = ''; end
+
+% --- ensure monitorGain exists even when loaded from JSON ---
+if ~isfield(expParams,'monitorGain') || ~isscalar(expParams.monitorGain) || ~isfinite(expParams.monitorGain)
+    expParams.monitorGain = 0.8;   % default monitoring level (0..1)
+end
+
+% Normalize paths for macOS
+if ismac
+    % root
+    if ~isfield(expParams,'root') || startsWith(expParams.root,'C:\') || contains(expParams.root,'\')
+        expParams.root = default_root;                      % dirs.data
+    end
+    % audio_common_path
+    if ~isfield(expParams,'audio_common_path') || startsWith(expParams.audio_common_path,'C:\') || contains(expParams.audio_common_path,'\')
+        expParams.audio_common_path = default_audio_common; % fullfile(dirs.stim,'audio')
+    end
 end
 
 expParams.computer = host;
@@ -165,6 +218,22 @@ end
 
 try, a=audioDeviceReader('Device','asdf'); catch me; str=regexp(regexprep(me.message,'.*Valid values are:',''),'"([^"]*)"','tokens'); strINPUT=[str{:}]; end;
 try, a=audioDeviceWriter('Device','asdf'); catch me; str=regexp(regexprep(me.message,'.*Valid values are:',''),'"([^"]*)"','tokens'); strOUTPUT=[str{:}]; end;
+
+S = audiodevinfo;  % built-in: returns struct with .input/.output arrays
+if ~exist('strINPUT','var') || isempty(strINPUT)
+    strINPUT  = {S.input.Name};   % cellstr of input device names
+end
+if ~exist('strOUTPUT','var') || isempty(strOUTPUT)
+    strOUTPUT = {S.output.Name};  % cellstr of output device names
+end
+
+% If still empty, bail with a clear message
+if isempty(strINPUT)
+    error('No audio input devices found. Plug in a mic or check System Settings > Sound > Input.');
+end
+if isempty(strOUTPUT)
+    error('No audio output devices found. Connect headphones/speakers or check System Settings > Sound > Output.');
+end
 
 %%%%% set audio input, stim output, and trigger devices
 % get focusrite device input number
@@ -186,29 +255,31 @@ tgind = find(contains(strOUTPUT, 'Playback')&contains(strOUTPUT, 'Focusrite'));
 
 % GUI for user to modify options
 fnames=fieldnames(expParams);
-fnames=fnames(~ismember(fnames,{'root','subject', 'session', 'run', 'task',...
-    'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats',...
-    'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
-    'play_question_audio_stim','show_question_orthography', ...
-    'timeStim','timePostOnset', 'timePreStim','timeMax','timeNoOnset', 'timeScan',...
-    'scan', 'deviceMic','deviceHead','deviceScan'}));
+fnames = fnames(~ismember(fnames,{ ...
+    'root','subject','session','run','task', ...
+    'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats', ...
+    'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats', ...
+    'cover_camera_when_nospeech','play_question_audio_stim','show_question_orthography', ...
+    'timeStim','timePostOnset','timePreStim','timeMax','timeNoOnset','timeScan', ...
+    'scan','deviceMic','deviceHead','deviceScan'}));
 for n=1:numel(fnames)
-    val=expParams.(fnames{n});
+    val = expParams.(fnames{n});
     if ischar(val), fvals{n}=val;
     elseif isempty(val), fvals{n}='';
     else fvals{n}=mat2str(val);
     end
 end
 
+out_dropbox = {'root','subject','session','run','task', ...
+    'play_question_audio_stim', ...                  
+    'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats', ...
+    'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats', ...
+    'cover_camera_when_nospeech','show_question_orthography', ...  
+    'timeStim','timePostOnset','timePreStim','timeMax','timeNoOnset','timeScan', ...
+    'scan','deviceMic','deviceHead','deviceScan'};
 
-out_dropbox = {'root',  'subject', 'session', 'run', 'task',...
-    'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats',...
-    'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
-    'play_question_audio_stim','show_question_orthography', ...
-    'timeStim','timePostOnset', 'timePreStim','timeMax','timeNoOnset', 'timeScan',...
-    'scan', 'deviceMic','deviceHead','deviceScan'};
 for n=1:numel(out_dropbox)
-    val=expParams.(out_dropbox{n});
+    val = expParams.(out_dropbox{n});
     if ischar(val), fvals_o{n}=val;
     elseif isempty(val), fvals_o{n}='';
     else fvals_o{n}=mat2str(val);
@@ -236,6 +307,31 @@ ht1=uicontrol(thfig,'style','popupmenu','units','norm','position',[.1,.75-8*defa
     'string',fnames,'value',1,'fontsize',default_fontsize-1,'callback',@thfig_callback1);
 ht2=uicontrol(thfig,'style','edit','units','norm','position',[.5,.75-8*default_intvl,.4,default_width],...
     'string','','backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1,'callback',@thfig_callback2);
+
+% --- Ensure device lists exist and indices are valid (minimal mac-safe fix) ---
+S = audiodevinfo;                 % built-in; returns struct with .input / .output
+
+% Make sure lists are non-empty cell arrays of char
+if ~exist('strINPUT','var') || isempty(strINPUT),  strINPUT  = {S.input.Name};  end
+if ~exist('strOUTPUT','var') || isempty(strOUTPUT), strOUTPUT = {S.output.Name}; end
+if isempty(strINPUT),  strINPUT  = {'<No input devices found>'};  end
+if isempty(strOUTPUT), strOUTPUT = {'<No output devices found>'}; end
+
+% Pick initial indices (must be scalar between 1..numel(list))
+% Try your preferred matches, fall back to 1
+ipind = find(contains(strINPUT,  'Analogue') & contains(strINPUT,'Focusrite'), 1, 'first');
+if isempty(ipind), ipind = find(contains(strINPUT,'Default'), 1, 'first'); end
+if isempty(ipind), ipind = 1; end
+ipind = max(1, min(ipind, numel(strINPUT)));
+
+opind = find(contains(strOUTPUT, 'Speakers') & contains(strOUTPUT,'Focusrite'), 1, 'first');
+if isempty(opind), opind = find(contains(strOUTPUT,'Default'), 1, 'first'); end
+if isempty(opind), opind = 1; end
+opind = max(1, min(opind, numel(strOUTPUT)));
+
+tgind = find(contains(strOUTPUT, 'Playback') & contains(strOUTPUT,'Focusrite'), 1, 'first');
+if isempty(tgind), tgind = 1; end
+tgind = max(1, min(tgind, numel(strOUTPUT)));
 
 % displays input devices
 uicontrol(thfig,'style','text','units','norm','position',[.1,.75-9*default_intvl,.35,default_width],...
@@ -285,12 +381,21 @@ thfig_callback1;
 uiwait(thfig);
 ok=ishandle(thfig);
 if ~ok, return; end
-expParams.deviceMic=strINPUT{get(ht3a,'value')};
-expParams.deviceHead=strOUTPUT{get(ht3b,'value')};
+% Assign chosen devices from GUI (safe indexing)
+idx = get(ht3a,'value');
+idx = max(1, min(idx, numel(strINPUT)));
+expParams.deviceMic = strINPUT{idx};
 
-if expParams.scan % skip this assignment if we're not scanning; if focusrite is not connected, it generates error here
-    expParams.deviceScan=strOUTPUT{get(ht3c,'value')};
+idx = get(ht3b,'value');
+idx = max(1, min(idx, numel(strOUTPUT)));
+expParams.deviceHead = strOUTPUT{idx};
+
+if expParams.scan
+    idx = get(ht3c,'value');
+    idx = max(1, min(idx, numel(strOUTPUT)));
+    expParams.deviceScan = strOUTPUT{idx};
 end
+
 delete(thfig);
 
 % save the configured values to expParams
@@ -319,6 +424,42 @@ anno_op.rectWidthProp = expParams.rectWidthProp;
 anno_op.rectHeightProp = expParams.rectHeightProp;
 anno_op.rectColor = expParams.rectColor; 
 annoStr = setUpVisAnnot_HW([0 0 0], anno_op);
+
+% Questioner window (left-justified layout, includes .goRect cue)
+qop = anno_op; qop.visible = 'off';
+anno_qustnr = setUpVisAnnot_HW_left_justified([0 0 0], qop);
+
+% Place questioner window on left half of primary monitor (like 2nd)
+mp = get(0,'MonitorPositions'); if isempty(mp), mp = get(0,'ScreenSize'); end
+prim = mp(1,:);
+fig_width  = prim(3) / 2;
+fig_height = prim(4) * 0.7;
+XPos = prim(3) / 2;
+YPos = prim(4) * 0.3;
+anno_qustnr.hfig.Position = [XPos YPos fig_width fig_height];
+anno_qustnr.hfig.Visible  = 'on';
+
+% --- Camera-blocker window positioned to the LEFT of the main stim figure ---
+% Primary monitor geometry
+mp = get(0,'MonitorPositions'); 
+if isempty(mp), mp = get(0,'ScreenSize'); end
+if isvector(mp), prim = mp; else, prim = mp(1,:); end   % [x y w h]
+
+% Main stim figure position (works regardless of fields on annoStr)
+mainFig = ancestor(annoStr.Stim, 'figure');
+mainPos = get(mainFig, 'Position');          % [x y w h]
+
+% Block the area to the left of the main stim window
+cam_blocker_x   = prim(1);
+cam_blocker_w   = max(1, mainPos(1) - prim(1));
+cam_blocker_pos = [cam_blocker_x, mainPos(2), cam_blocker_w, mainPos(4)];
+
+hfig_cam_blocker = figure('Visible','off','NumberTitle','off','Color',[0 0 0], ...
+    'Position', cam_blocker_pos, 'MenuBar','none','ToolBar','none');
+
+if isfield(expParams,'cover_camera_when_nospeech') && expParams.cover_camera_when_nospeech
+    hfig_cam_blocker.Visible = 'on';
+end
 
 CLOCKp = ManageTime('start');
 TIME_PREPARE = 0.5; % Waiting period before experiment begin (sec)
@@ -400,40 +541,110 @@ trials = table;
 trials(isbase,:) = repmat(baserow, expParams.n_base_trials, 1); % fill in baseline trials
 trials(~isbase,:) = trials_speech; % fill in speech trials
 
+expParams.sr = 48000;            % sample frequenct (Hz)
+frameDur = .050;                 % frame duration in seconds
+% --- Low-latency global frame size ---
+FRAME = 256;                     % try 128; 64 if rock solid; 256 if CPU is tight
+expParams.frameLength = FRAME;   % keep reader/writer/beep aligned
 
 
+% === PRELOAD ALL AUDIO FILES (low-latency setup) ===
+stim_q_file_extension = 'mp3';
+fprintf('Preloading all question audio stimuli...\n');
+preloadedAudio = cell(height(trials),1);
 
+for ii = 1:height(trials)
+    if trials.basetrial(ii)     % skip baseline trials
+        preloadedAudio{ii} = [];
+        continue;
+    end
 
+    stim_q_file = fullfile(dirs.stim_audio, [trials.stimfile{ii} '.' stim_q_file_extension]);
+    [aud, fs_in] = audioread(stim_q_file);
+
+    % Resample to match experiment SR
+    if fs_in ~= expParams.sr
+        aud = resample(aud, expParams.sr, fs_in);
+    end
+
+    % Force stereo
+    if size(aud,2) == 1
+        aud = [aud aud];
+    end
+
+    preloadedAudio{ii} = aud;
+end
+fprintf('Finished preloading %d audio stimuli.\n', height(trials));
+% --- Prebuffer beep once, matched to FRAME ---
+FRAME = expParams.frameLength;  % keep everything on the same frame size
+[beepWav, beepFs] = audioread(fullfile(fileparts(which(mfilename)),'flvoice_run_beep.wav'));
+if beepFs ~= expParams.sr
+    beepWav = resample(beepWav, expParams.sr, beepFs);
+end
+if size(beepWav,2) == 1
+    beepWav = [beepWav beepWav]; % force stereo
+end
+pad = mod(-size(beepWav,1), FRAME);
+if pad > 0
+    beepWav(end+1:end+pad, :) = 0;      % pad to multiple of FRAME
+end
+% store as frames: (#frames x (2*FRAME)), then slice to FRAME x 2 later
+beepFrames = reshape(beepWav.', 2*FRAME, []).';
+beepGain = 0.25;
+beepFrames = beepGain * beepFrames;
+beepActive = false;      % state flag used in trial loop
+beepIdx = 1;             % frame index into beepFrames
 
 %%
 sileread = dsp.AudioFileReader(fullfile(expParams.audio_common_path, 'silent.wav'), 'SamplesPerFrame', 2048);
 
+% --- Use GUI selections; validate and fallback without CLI prompts ---
+% If GUI values are empty or out of range, fall back to first available
 
-% set audio device variables: deviceReader: mic input; beepPlayer: beep output; triggerPlayer: trigger output
-if isempty(expParams.deviceMic)
-    disp(char(arrayfun(@(n)sprintf('Device #%d: %s ',n,strINPUT{n}),1:numel(strINPUT),'uni',0))); ID=input('MICROPHONE input device # : ');
-    expParams.deviceMic=strINPUT{ID};
+% Mic
+if ~exist('strINPUT','var') || isempty(strINPUT)
+    error('No audio input devices found.');
 end
-if ~ismember(expParams.deviceMic, strINPUT), expParams.deviceMic=strINPUT{find(strncmp(lower(expParams.deviceMic),lower(strINPUT),numel(expParams.deviceMic)),1)}; end
-assert(ismember(expParams.deviceMic, strINPUT), 'unable to find match to deviceMic name %s',expParams.deviceMic);
-if isempty(expParams.deviceHead)||(expParams.scan&&isempty(expParams.deviceScan))
-    disp(char(arrayfun(@(n)sprintf('Device #%d: %s ',n,strOUTPUT{n}),1:numel(strOUTPUT),'uni',0)));
-    if isempty(expParams.deviceHead),
-        ID=input('HEADPHONES output device # : ');
-        expParams.deviceHead=strOUTPUT{ID};
-    end
-    if expParams.scan&&isempty(expParams.deviceScan)
-        ID=input('SCAN TRIGGER output device # : ');
-        expParams.deviceScan=strOUTPUT{ID};
+if isempty(expParams.deviceMic) || ~ismember(expParams.deviceMic, strINPUT)
+    % try partial match, else first entry
+    pm = find(strncmpi(expParams.deviceMic, strINPUT, max(1,numel(expParams.deviceMic))), 1, 'first');
+    if ~isempty(pm)
+        expParams.deviceMic = strINPUT{pm};
+    else
+        expParams.deviceMic = strINPUT{1};
     end
 end
+
+% Headphones
+if ~exist('strOUTPUT','var') || isempty(strOUTPUT)
+    error('No audio output devices found.');
+end
+if isempty(expParams.deviceHead) || ~ismember(expParams.deviceHead, strOUTPUT)
+    pm = find(strncmpi(expParams.deviceHead, strOUTPUT, max(1,numel(expParams.deviceHead))), 1, 'first');
+    if ~isempty(pm)
+        expParams.deviceHead = strOUTPUT{pm};
+    else
+        expParams.deviceHead = strOUTPUT{1};
+    end
+end
+
+% Scanner trigger (only if scanning)
+if expParams.scan
+    if isempty(expParams.deviceScan) || ~ismember(expParams.deviceScan, strOUTPUT)
+        pm = find(strncmpi(expParams.deviceScan, strOUTPUT, max(1,numel(expParams.deviceScan))), 1, 'first');
+        if ~isempty(pm)
+            expParams.deviceScan = strOUTPUT{pm};
+        else
+            % If nothing sensible, use same as headphones (or first output)
+            expParams.deviceScan = expParams.deviceHead;
+        end
+    end
+end
+
 % set up device reader settings for accessing audio signal during recording
-expParams.sr = 48000;            % sample frequenct (Hz)
-frameDur = .050;                 % frame duration in seconds
-expParams.frameLength = expParams.sr*frameDur;      % framelength in samples
 deviceReader = audioDeviceReader(...
     'Device', expParams.deviceMic, ...
-    'SamplesPerFrame', expParams.frameLength, ...
+    'SamplesPerFrame', FRAME, ...
     'SampleRate', expParams.sr, ...
     'BitDepth', '24-bit integer');
 
@@ -444,9 +655,12 @@ assert(ismember(expParams.deviceHead, strOUTPUT), 'unable to find match to devic
 [twav, tfs] = audioread(fullfile(fileparts(which(mfilename)),'flvoice_run_beep.wav'));
 beepdur = numel(twav)/tfs;
 
-beepread = dsp.AudioFileReader(fullfile(fileparts(which(mfilename)),'flvoice_run_beep.wav'), 'SamplesPerFrame', 2048);
-headwrite = audioDeviceWriter('SampleRate',beepread.SampleRate,'Device',expParams.deviceHead);
-
+headwrite = audioDeviceWriter( ...
+    'SampleRate', expParams.sr, ...
+    'SupportVariableSizeInput', true, ...
+    'BufferSize', FRAME, ...
+    'Device', expParams.deviceHead);
+setup(headwrite, zeros(FRAME,2)); 
 if expParams.scan
     if ~ismember(expParams.deviceScan, strOUTPUT), expParams.deviceScan=strOUTPUT{find(strncmp(lower(expParams.deviceScan),lower(strOUTPUT),numel(expParams.deviceScan)),1)}; end
     assert(ismember(expParams.deviceScan, strOUTPUT), 'unable to find match to deviceScan name %s',expParams.deviceScan);
@@ -581,7 +795,15 @@ set(annoStr.Stim, 'Visible','off');     % Turn off preparation page
 CLOCK=[];                               % Main clock (not yet started)
 expParams.timeNULL = expParams.timeMax(1) + diff(expParams.timeMax).*rand;
 intvs = [];
+beepActive = false;
 
+% Pre-warm audio system with silent audio
+fprintf('Pre-warming audio system...\n');
+silentFrame = zeros(FRAME, 2); % Stereo silent frame
+for i = 1:10 % Send a few silent frames to initialize
+    headwrite(silentFrame);
+end
+fprintf('Audio system warmed up.\n');
 %% LOOP OVER TRIALS
 for itrial = 1:expParams.ntrials
 
@@ -611,17 +833,39 @@ for itrial = 1:expParams.ntrials
         next_trial_string = '';
     end
 
-    if trials.basetrial(itrial)
-        experimenter_cue_string = '(BASELINE TRIAL - NO QUESTION)'; 
-    elseif ~trials.basetrial(itrial)
-       experimenter_cue_string = trials.question{itrial};
+    if ~trials.basetrial(itrial)
+        % Prepare beep to be mixed live in the frame loop (no pauses)
+    beepActive = true;
+    beepIdx = 1;
+
+    set(anno_qustnr.Plus, 'Visible', 'off');
+    set(anno_qustnr.Stim, 'Visible', 'off');
+    set(anno_qustnr.goRect, 'Visible', 'on');
     end
 
-    fprintf(['\n', experimenter_cue_string, ' ........ trial ', num2str(itrial), '/' num2str(expParams.ntrials), ...
-        '\n      [[[[''',trials.answer{itrial}, ''']]]]',...
-        '\n\n'     , ...
-        next_trial_string,...
-        '\n']);
+% --- decide what to present this trial & camera-blocker state ---
+if trials.basetrial(itrial)
+    experimenter_cue_string = '(BASELINE TRIAL - NO QUESTION)';
+    cam_blocker_state = tern(expParams.cover_camera_when_nospeech,'on','off');
+else
+    experimenter_cue_string = trials.question{itrial};
+    cam_blocker_state = 'off';
+end
+
+set(anno_qustnr.Stim, 'String', experimenter_cue_string);
+set(anno_qustnr.Stim, 'Visible', 'on');
+hfig_cam_blocker.Visible = cam_blocker_state;
+
+% (optional) next_trial_string like your 2nd script
+if itrial < expParams.ntrials
+    next_trial_string = sprintf('\n\n      Next trial''s question/answer will be:\n ''%s'' /// ''%s''', ...
+        trials.question{itrial+1}, trials.answer{itrial+1});
+else
+    next_trial_string = '';
+end
+
+fprintf(['\n', experimenter_cue_string, ' ........ trial ', num2str(itrial), '/', num2str(expParams.ntrials), ...
+    '\n      [[[[''',trials.answer{itrial}, ''']]]]', '\n\n', next_trial_string, '\n']);
 
 
     prepareScan=0.250*(expParams.scan~=0); % if scanning, end recording 250ms before scan trigger
@@ -691,9 +935,15 @@ for itrial = 1:expParams.ntrials
         % ok=ManageTime('wait', CLOCK, TIME_SOUND_START);
         stim_q_file_extension = 'mp3';
         stim_q_file = [dirs.stim_audio, filesep, trials.stimfile{itrial}, '.', stim_q_file_extension]; % audio file for this trial
-        [Input_sound, Input_fs] = audioread(stim_q_file); 
-        stimPlayer = audioplayer(Input_sound,Input_fs, 24);
-        play(stimPlayer);
+        % === Low-latency playback from preloaded buffer ===
+        stimAudio = preloadedAudio{itrial};   % N x 2, SR matches
+        if ~isempty(stimAudio)
+            pad = mod(-size(stimAudio,1), FRAME);
+            if pad>0, stimAudio(end+1:end+pad,:) = 0; end
+        end
+        TIME_SOUND_ACTUALLYSTART = ManageTime('current', CLOCK);
+        TIME_SOUND_END = TIME_SOUND_ACTUALLYSTART + trialData(itrial).timeStim;
+
         % sttInd=1; endMax=size(Input_sound, 1); while sttInd<endMax; headwrite(Input_sound(sttInd:min(sttInd+2047, endMax))); sttInd=sttInd+2048; end; reset(headwrite);
         TIME_SOUND_ACTUALLYSTART = ManageTime('current', CLOCK);
         % while ~isDone(stimread); sound=stimread();headwrite(sound);end;release(stimread);reset(headwrite);
@@ -703,6 +953,18 @@ for itrial = 1:expParams.ntrials
         % if show_timing_warnings
         %     if ~ok, fprintf('i am late for this trial TIME_SOUND_START\n'); end
         % end
+    end
+    % Initialize stim audio playback variables
+    stimAudio = [];
+    stimAudioFrameIdx = 1;
+    
+    if expParams.play_question_audio_stim && ~trials.basetrial(itrial)
+        stimAudio = preloadedAudio{itrial}; % N x 2 stereo, sample rate matches expParams.sr
+        % Pad stimAudio to multiple of FRAME for neat frame slicing
+        pad = mod(-size(stimAudio,1), FRAME);
+        if pad > 0
+            stimAudio(end+1:end+pad, :) = 0;
+        end
     end
 
     TIME_TEXT_END = TIME_TEXT_ACTUALLYSTART + trialData(itrial).timeStim;           % stimulus ends
@@ -724,13 +986,15 @@ for itrial = 1:expParams.ntrials
     ok=ManageTime('wait', CLOCK, TIME_GOSIGNAL_START);     % waits for GO signal time
 
     % play beep and switch to visual go cue if it's a speech trial
-    if ~trials.basetrial(itrial)
-        % GO signal goes with beep
-        while ~isDone(beepread); sound=beepread();headwrite(sound);end;reset(beepread);reset(headwrite);
-        set(annoStr.Plus, 'Visible','off'); % remove fixcross
-        set(annoStr.Stim, 'Visible','off'); % remove stim question orthography if it's there (unobserved condition)
-        set(annoStr.goArrow, 'Visible', 'on');  % <-- SHOW GREEN ARROW
-    end
+if ~trials.basetrial(itrial)
+    beepActive = true;   % start emitting beep frames in the frame loop
+    beepIdx = 1;
+
+    set(anno_qustnr.goRect,'Visible','off');
+    set(anno_qustnr.Plus,  'color','r');
+    set(anno_qustnr.Plus,'Visible','on');
+end
+
 
     TIME_GOSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK); % actual time for GO signal 
 
@@ -761,9 +1025,42 @@ for itrial = 1:expParams.ntrials
         recAudio(begIdx+numOverrun:endIdx+numOverrun) = audioFromDevice;    % save frame to audio vector
         nMissingSamples = nMissingSamples + numOverrun;     % keep count of cumulative missng samples between frames
 
+        % 1) mic block (FRAME x 2)
+        micBlock = audioFromDevice;
+        if size(micBlock,2) == 1, micBlock = [micBlock micBlock]; end
+        micBlock = expParams.monitorGain * micBlock;
+        
+        % 2) beep block from prebuffered frames (FRAME x 2), if active
+        if beepActive
+            bPacked = beepFrames(beepIdx, :);
+            b = reshape(bPacked, [2, FRAME]).';
+            beepIdx = beepIdx + 1;
+            if beepIdx > size(beepFrames,1)
+                beepActive = false;
+            end
+            baseMix = micBlock + b;
+        else
+            baseMix = micBlock;
+        end
+        
+        % 3) stim audio playback mixing
+        if ~isempty(stimAudio) && stimAudioFrameIdx <= size(stimAudio,1)
+            stimFrame = stimAudio(stimAudioFrameIdx : stimAudioFrameIdx+FRAME-1, :);
+            stimAudioFrameIdx = stimAudioFrameIdx + FRAME;
+            mix = baseMix + stimFrame;  % mix stim audio frame in
+        else
+            mix = baseMix;
+        end
+        
+        % 4) write mixed frame to output device
+        headwrite(mix);
+
         % plot audio data
-        set(micSignal, 'xdata',time, 'ydata',recAudio(1:numel(time)))
-        drawnow()
+if mod(frameCount, 16) == 0
+    set(micSignal, 'xdata', time, 'ydata', recAudio(1:numel(time)));
+    drawnow limitrate   % or: drawnow nocallbacks
+end
+
     
         % voice onset exclusion
         minVoiceOnsetTime = max(0, expParams.minVoiceOnsetTime-(begIdx+numOverrun)/expParams.sr);
@@ -798,7 +1095,6 @@ for itrial = 1:expParams.ntrials
                 endSamples = nSamples;
                 % add voice onset to plot
                 set(micLine,'value',voiceOnsetTime + beepTime,'visible','on');
-                drawnow update
             else
                 CURRENT_TIME = ManageTime('current', CLOCK);
                 if CURRENT_TIME - TIME_GOSIGNAL_ACTUALLYSTART - prepareScan > trialData(itrial).timeNoOnset + nonSpeechDelay
@@ -826,13 +1122,10 @@ for itrial = 1:expParams.ntrials
 
     % end-of-trial visual stim for speech trials
     if ~trials.basetrial(itrial)
-
-        set(annoStr.goArrow, 'Visible', 'off');  % <-- HIDE GREEN ARROW
-        set(annoStr.Plus, 'color','r');  
-        set(annoStr.Plus, 'Visible','on');
-
+        set(anno_qustnr.Plus,'Visible','off');
+        set(anno_qustnr.Stim,'Visible','off');
+        set(anno_qustnr.goRect,'Visible','on');
        fprintf('\n ------- RED STOP GO CUE NOW ONSCREEN -------- \n\n')
-
     end
 
 
@@ -905,7 +1198,6 @@ for itrial = 1:expParams.ntrials
 end
 
 release(headwrite);
-release(beepread);
 if expParams.scan
     release(trigwrite);
     release(trigread);
@@ -1036,6 +1328,4 @@ switch(lower(option))
         out=etime(clock,t0);
 end
 end
-
-        
-
+function y = tern(cond,a,b), if cond, y=a; else, y=b; end, end
