@@ -339,14 +339,14 @@ end
 
 % make figure for displaying questions for question-asker (investigator); put on first monitor 
 anno_op.visible = 'off'; % start invisible before moving into place
-anno_qustnr = setUpVisAnnot_HW(expParams.fig_background_color, anno_op);
+anno_qustnr = setUpVisAnnot_HW_left_justified(expParams.fig_background_color, anno_op);
 monitorSize = get(0, 'Monitor');
 fig_width = monitorSize(1,3) / 2; % Start at middle of first monitor
 fig_height = monitorSize(1,4) * 0.7;
 XPos = monitorSize(1,3) / 2;  %
 YPos = monitorSize(1,4) * 0.3;
 winPos = [XPos YPos fig_width fig_height]; % left,bottom,w,h
-anno_qustnr.Position = winpos;      anno_op.visible = 'on'; % move into place and turn visible
+anno_qustnr.hfig.Position = winPos;      anno_op.hfig.visible = 'on'; % move into place and turn visible
 
 %%%%%%%% only turn on timing warnings on commandline for debugging or in unobserved condition; otherwise is distracting for experimenter
 show_timing_warnings = expParams.play_question_audio_stim; % 'play_question_audio_stim' is true only in unobserved condition
@@ -697,6 +697,9 @@ for itrial = 1:expParams.ntrials
     
     set(anno_stim.Plus, 'Visible','off');        
     set(anno_stim.Stim, 'color', 'w');
+
+    set(anno_qustnr.Plus, 'Visible','off');        
+    set(anno_qustnr.Stim, 'color', 'w');
     
     % determine what to display
     if expParams.show_question_orthography
@@ -763,7 +766,7 @@ for itrial = 1:expParams.ntrials
         % show go cue in questioner figure to indicate to look at the camera
         set(anno_qustnr.Plus, 'Visible','off'); % remove fixcross
         set(anno_qustnr.Stim, 'Visible','off'); % remove stim question orthography if it's there
-        set(anno_stim.Rect, 'Visible', 'on');  % <-- show go cue
+        set(anno_qustnr.goRect, 'Visible', 'on');  % <-- show go cue
 
     end
 

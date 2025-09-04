@@ -50,7 +50,7 @@ cuAnoPos = getPos(cuAnoD, winPos);
 % cuAnoPos = [0.35 0.10 0.25 0.25];
 
 % Preparing 'Stim' Annotation Position
-stimAnoD = [0.30 0.50]; % if stim too small/large, need to adjust
+stimAnoD = [0.60 0.40]; % Made wider to accommodate more text
 stimAnoPos = getPos(stimAnoD, winPos);
 
 %% Actually create the stim presentation figure
@@ -69,7 +69,7 @@ cSettings = {'Color',txt,...
     'FontSize',40,...
     'FontWeight','bold',...
     'FontName','Arial',...
-    'FitBoxToText','on',...
+    'FitBoxToText','off',... % Changed to 'off' to allow proper positioning
     'EdgeColor','none',...
     'BackgroundColor',bg,...
     'visible','off'};
@@ -100,6 +100,15 @@ annoStr.Stim = annotation(annoStr.hfig,'textbox', stimAnoPos,...
     'String',{'stim'},...
     cSettings{:});
 
+% --- Override to span full figure width and left-justify ---
+set(annoStr.Stim, ...
+    'Position', [0.02 0.05 0.96 0.9], ...   % [left bottom width height] in normalized units
+    'HorizontalAlignment','left', ...
+    'VerticalAlignment','middle', ...
+    'Interpreter','none', ...               % avoid TeX interpretation surprises
+    'FitBoxToText','off');                  % keep the box size fixed so text wraps to box
+
+
 annoStr.Pic = axes(annoStr.hfig, 'pos',[1/2-winPos(4)/(4*winPos(3)) 0.25 winPos(4)/(2*winPos(3)) 0.5]);
 axes(annoStr.Pic)
 imshow([])
@@ -119,58 +128,28 @@ annoStr.goRect = annotation(annoStr.hfig, 'rectangle', [rectX, rectY, op.rectWid
 % Add a helper function for setting wrapped text
 annoStr.setWrappedText = @(textStr) setWrappedText(annoStr.Stim, textStr);
 
+% Add a helper function to set text with automatic wrapping for stimulus
+annoStr.setStimText = @(textStr) setWrappedText(annoStr.Stim, textStr);
+
 end
 
 % Function to determine annotation position
-function anoPos = getPos(anoD, winPos)
-
-
-    anoW = round(anoD(1)/winPos(3), 2);
-    anoH = round(anoD(2)/winPos(4), 2);
-    anoX = 0.5 - anoW/2; %%% shift left.... to center instead, use 0.5 - anoW/2
-    anoY = 0.5 - anoH/2;
+function anoPos = getPos(anoD, winPos)    
+    % For stimulus text, use full width positioning
+    if anoD(1) >= 1.0  % This is the stimulus text box
+        anoX = 0;      % Start at very left edge
+        anoY = 0.05;   % Small top margin
+        anoW = 1.0;    % Use full width
+        anoH = 0.9;    % Use most of height
+    else
+        % For other annotations, use original logic
+        anoW = anoD(1) * 100 / winPos(3);
+        anoH = anoD(2) * 100 / winPos(4);
+        anoW = anoW / 100;
+        anoH = anoH / 100;
+        anoX = 0.5 - anoW/2; % Center horizontally
+        anoY = 0.5 - anoH/2; % Center vertically
+    end
+    
     anoPos = [anoX anoY anoW anoH];
-
 end
-
-
-% Helper function to set text with automatic wrapping
-function setWrappedText(textObj, textStr)
-    % Simple text wrapping function
-    maxCharsPerLine = 60; % Adjust based on font size and box width
-    
-    if length(textStr) <= maxCharsPerLine
-        set(textObj, 'String', textStr);
-        return;
-    end
-    
-    % Split long text into lines
-    words = strsplit(textStr, ' ');
-    lines = {};
-    currentLine = '';
-    
-    for i = 1:length(words)
-        testLine = [currentLine, words{i}, ' '];
-        if length(testLine) > maxCharsPerLine && ~isempty(currentLine)
-            lines{end+1} = strtrim(currentLine);
-            currentLine = [words{i}, ' '];
-        else
-            currentLine = testLine;
-        end
-    end
-    
-    if ~isempty(currentLine)
-        lines{end+1} = strtrim(currentLine);
-    end
-    
-    % Set the wrapped text
-    set(textObj, 'String', lines);
-end
-
-
-
-
-
-
-
-
