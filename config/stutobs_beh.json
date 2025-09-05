@@ -15,7 +15,7 @@
     "play_question_audio_stim" : false, 
     "show_question_orthography": false,
     "scan": false,
-    "timeStim": [4.0,4.5],
+    "timeStim": [3,3.5],
     "timePostOnset": 4,
     "timeScan": 1.6,
     "timePreStim": 0.50,

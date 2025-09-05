@@ -497,7 +497,11 @@ expParams.timeScan=sort(expParams.timeScan);
 expParams.timePreStim=sort(expParams.timePreStim);
 expParams.timeMax=sort(expParams.timeMax);
 expParams.timeNoOnset=sort(expParams.timeNoOnset);
-rmsThresh = expParams.rmsThresh; % params for detecting voice onset %voiceCal.rmsThresh; % alternatively, run a few iterations of testThreshold and define rmsThreshd here with the resulting threshold value after convergence
+
+    % params for detecting voice onset %voiceCal.rmsThresh; 
+    % alternatively, run a few iterations of testThreshold and define rmsThreshd here...
+    % ....with the resulting threshold value after convergence
+rmsThresh = expParams.rmsThresh; 
 rmsBeepThresh = expParams.rmsBeepThresh;
 % nonSpeechDelay = .75; % initial estimate of time between go signal and voicing start
 nonSpeechDelay = .5; % initial estimate of time between go signal and voicing start
@@ -784,7 +788,7 @@ for itrial = 1:expParams.ntrials
     % reaction time
     TIME_VOICE_START = TIME_GOSIGNAL_ACTUALLYSTART + nonSpeechDelay;                   % expected voice onset time
 
-    TIME_SCAN_START = TIME_GOSIGNAL_ACTUALLYSTART + trials.basetrial(itrial) * trialData(itrial).timeMax + (1-trials.basetrial(itrial))*expParams.timeNULL;
+    TIME_SCAN_START = TIME_GOSIGNAL_ACTUALLYSTART + ~trials.basetrial(itrial) * trialData(itrial).timeMax + (1-trials.basetrial(itrial))*expParams.timeNULL;
 
     endSamples = trials.basetrial(itrial) * nSamples + (1-trials.basetrial(itrial))*nSamplesNULL;
     while endIdx < endSamples
@@ -807,14 +811,15 @@ for itrial = 1:expParams.ntrials
         minVoiceOnsetTime = max(0, expParams.minVoiceOnsetTime-(begIdx+numOverrun)/expParams.sr);
         
         % detect beep onset
-        if trials.basetrial(itrial) && beepDetected == 0 && expParams.minVoiceOnsetTime > (begIdx+numOverrun)/expParams.sr
+        if ~trials.basetrial(itrial) && beepDetected == 0 && expParams.minVoiceOnsetTime > (begIdx+numOverrun)/expParams.sr
             % look for beep onset
-            [beepDetected, bTime, beepOnsetState]  = detectVoiceOnset(recAudio(begIdx+numOverrun:endIdx+numOverrun), expParams.sr, expParams.rmsThreshTimeOnset, rmsBeepThresh, 0, beepOnsetState);
+            [beepDetected, bTime, beepOnsetState]  = detectVoiceOnset(recAudio(begIdx+numOverrun:endIdx+numOverrun),...
+                expParams.sr, expParams.rmsThreshTimeOnset, rmsBeepThresh, 0, beepOnsetState);
             if beepDetected
                 beepTime = bTime + (begIdx+numOverrun)/expParams.sr; 
                 set(micLineB,'value',beepTime,'visible','on');
             end
-        elseif trials.basetrial(itrial) && voiceOnsetDetected == 0,% && frameCount > onsetWindow/frameDur
+        elseif ~trials.basetrial(itrial) && voiceOnsetDetected == 0,% && frameCount > onsetWindow/frameDur
             if ~beepDetected; beepTime = 0; 
                %%%%%%%% timing warnings
                 if show_timing_warnings
@@ -824,7 +829,9 @@ for itrial = 1:expParams.ntrials
             trialData(itrial).beepTime = beepTime;
 
             % look for voice onset in previous onsetWindow
-            [voiceOnsetDetected, voiceOnsetTime, voiceOnsetState]  = detectVoiceOnset(recAudio(begIdx+numOverrun:endIdx+numOverrun), expParams.sr, expParams.rmsThreshTimeOnset, rmsThresh, minVoiceOnsetTime, voiceOnsetState);
+            [voiceOnsetDetected, voiceOnsetTime, voiceOnsetState]  = ...
+                detectVoiceOnset(recAudio(begIdx+numOverrun:endIdx+numOverrun), ...
+                expParams.sr, expParams.rmsThreshTimeOnset, rmsThresh, minVoiceOnsetTime, voiceOnsetState);
             % update voice onset time based on index of data passed to voice onset function
 
             if voiceOnsetDetected
