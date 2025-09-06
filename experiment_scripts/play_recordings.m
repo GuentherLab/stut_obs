@@ -2,7 +2,8 @@
 % Note that you should not load the combined result file (*audio.mat)
 
 % Load the trial result you want to listen
-load('sub-TEST02/ses-1/beh/md/sub-TEST02_ses-1_run-1_task-md_trial-24.mat');
+load(['C:\ieeg_stut\sub-stutobs-pilot001\ses-1\beh\jackson20\run1\'...
+    'sub-stutobs-pilot001_ses-1_run-01_task-jackson20_trial-14.mat']);
 info=audiodevinfo;
 player=audioplayer(tData.s, tData.fs, 24, info.output(1).ID);
 play(player)
