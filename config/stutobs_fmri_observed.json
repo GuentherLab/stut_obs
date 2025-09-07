@@ -1,6 +1,5 @@
 {
     "root": "C:\\ieeg_stut",
-    "audio_common_path": "C:\\docs\\code\\stut_obs\\stimuli\\audio",
     "subject": "example",
     "session": 1,
     "run": 1,
@@ -21,6 +20,7 @@
     "timePreStim": 0.50,
     "timeNoOnset": 3.0,
     "timeMax": 6.5,
+    "timeMaxBaseline": [5.5 6.5],
     "rmsThresh": 0.02,
     "rmsBeepThresh": 0.1,
     "rmsThreshTimeOnset": 0.02,

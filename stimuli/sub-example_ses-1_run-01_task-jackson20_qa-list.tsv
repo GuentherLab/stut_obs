@@ -1,0 +1,11 @@
+n_syls	answer	question	stimfile
+4	Architecture	The study of building design is called....	q_female_architecture
+5	Italian wine	Describe fermented grape juice from Rome.	q_female_italian-wine
+4	Jonathan Doe	What is your first and last name?	q_female_name
+4	Dedication	What do you call commitment to a cause?	q_female_dedication
+4	Attleboro	What city are you from?	q_female_city-from
+5	Massachusetts	What state did you go to college in?	q_female_state-college
+5	How are you doing?	Say a friendly greeting.	q_female_greeting
+5	Biological	How do you describe a living organism?	q_female_biological
+4	Stuttering block	What is it called when you can't get a word out? 	q_female_stutter
+4	Do you want to go? 	Ask me if I wish to leave.	q_female_want-to-go

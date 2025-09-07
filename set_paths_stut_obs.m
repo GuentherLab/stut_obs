@@ -71,6 +71,7 @@ end
 
 % stimuli
 dirs.stim = [dirs.projrepo, filesep, 'stimuli'];
+dirs.audio_common = [dirs.stim, filesep, 'audio']; % audio files shared across subjects
 dirs.config = fullfile(dirs.projrepo, 'config');  % configuration files
 dirs.derivatives = [dirs.data, filesep, 'der']; % derivatives of source data
 
