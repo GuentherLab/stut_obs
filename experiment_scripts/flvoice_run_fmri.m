@@ -47,7 +47,7 @@ default_fontsize = 12;
 %       scan                        : true/false include scanning segment in experiment sequence [1] 
 %       timePostStim                : time (s) from end of the text stimulus presentation to the GO signal (D1 in schematic above) (one value for fixed time, two values for minimum-maximum range of random times) [.25 .75] 
 %       timePostOnset               : time (s) from subject's voice onset to the scanner trigger (or to pre-stimulus segment, if scan=false) (D2 in schematic above) (one value for fixed time, two values for minimum-maximum range of random times) [4.5] 
-%       timeMax                     : maximum time (s) before GO signal and scanner trigger (or to pre-stimulus segment, if scan=false) (D3 in schematic above) (recording portion in a trial may end before this if necessary to start scanner) [5.5] 
+%       timeMax                     : maximum time (s) between GO signal and scanner trigger (or to pre-stimulus segment, if scan=false) (D3 in schematic above) (recording portion in a trial may end before this if necessary to start scanner) [5.5] 
 %       timeScan                    : (if scan=true) duration (s) of scan (D4 in schematic above) (one value for fixed time, two values for minimum-maximum range of random times) [1.6] 
 %       timePreStim                 : time (s) from end of scan to start of next trial stimulus presentation (D5 in schematic above) (one value for fixed time, two values for minimum-maximum range of random times) [.25] 
 %       timePreSound                : time (s) from start of orthographic presentation to the start of sound stimulus (D6 in schematic above) [.5]
@@ -315,6 +315,18 @@ for n=1:numel(out_dropbox)
 end
 expParams.runstring = sprintf(['%0',num2str(num_run_digits),'d'], expParams.run); % add zero padding
 
+%%% AM note - sets trial duration of baseline trials to jittered time between timeMax(1) and (2)
+%%% ... by setting this jitter outside of the trial loop, we fix a single baseline pre-GO time for all trials in this run
+%%% ... whereas jitter is recalculated on every trial for speech trials
+expParams.timeNULL = expParams.timeMax(1) + diff(expParams.timeMax).*rand;
+
+%%%%%%%%  when to turn on timing warnings on commandline 
+% show_timing_warnings = expParams.play_question_audio_stim; % 'play_question_audio_stim' is true only in unobserved condition
+show_timing_warnings = 1; % always show timing warnings
+
+%%% option to display the upcoming trial on the commandline.... generally unnecessary/distracting during the observed condition
+upcoming_trial_on_commandline = 0; 
+
 %% visual stimulus figure setup
 expParams.fig_background_color = [0 0 0];
 anno_op.rectWidthProp = expParams.rectWidthProp;
@@ -349,14 +361,11 @@ YPos = monitorSize(1,4) * 0.3;
 winPos = [XPos YPos fig_width fig_height]; % left,bottom,w,h
 anno_qustnr.hfig.Position = winPos;      anno_op.hfig.visible = 'on'; % move into place and turn visible
 
-%%%%%%%%  when to turn on timing warnings on commandline 
-% show_timing_warnings = expParams.play_question_audio_stim; % 'play_question_audio_stim' is true only in unobserved condition
-show_timing_warnings = 1; % always show timing warnings
 
-%%% option to display the upcoming trial on the commandline.... generally unnecessary/distracting during the observed condition
-upcoming_trial_on_commandline = 0; 
 
-%% load stim list
+
+
+%% load stim list and create trial table
 % root path is where the subject description files are
 dirs.ses = [expParams.root, filesep, sprintf('sub-%s',expParams.subject), filesep, sprintf('ses-%d',expParams.session)];
 dirs.stim_audio = [dirs.ses, filesep, 'stim_audio']; 
@@ -369,7 +378,7 @@ if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite',...
         'Answer', 'Yes - overwrite', 'No - quit','No - quit')), return; 
 end
 
-%% create trial table
+% create trial table
 unique_qa = readtable(unique_answers_file,'FileType','text');
 n_unique_qa = height(unique_qa); 
 expParams.n_speech_trials = n_unique_qa * expParams.repetitions_per_unique_qa; 
@@ -427,7 +436,7 @@ trials(isbase,:) = repmat(baserow, expParams.n_base_trials, 1); % fill in baseli
 trials(~isbase,:) = trials_speech; % fill in speech trials
 
 
-%%
+%% audio device setup
 sileread = dsp.AudioFileReader(fullfile(expParams.audio_common_path, 'silent.wav'), 'SamplesPerFrame', 2048);
 
 
@@ -484,7 +493,7 @@ if expParams.scan
     trigwrite = audioDeviceWriter('SampleRate',trigread.SampleRate,'Device',expParams.deviceScan);
 end
 
-% checks values of timing variables
+%% checks values of timing variables
 expParams.beepoffset = beepoffset;
 
 assert(all(isfinite(expParams.timeStim))&ismember(numel(expParams.timeStim),[1,2]), ...
@@ -505,7 +514,7 @@ if numel(expParams.timeScan)==1, expParams.timeScan=expParams.timeScan+[0 0]; en
 if numel(expParams.timePreStim)==1, expParams.timePreStim=expParams.timePreStim+[0 0]; end
 if numel(expParams.timeMax)==1, expParams.timeMax=expParams.timeMax+[0 0]; end
 if numel(expParams.timeNoOnset)==1, expParams.timeNoOnset=expParams.timeNoOnset+[0 0]; end
-expParams.timeStim=sort(expParams.timeStim);
+expParams.timeStim=sort(expParams.timeStim); % make sure shorter duration comes first
 expParams.timePostOnset=sort(expParams.timePostOnset);
 expParams.timeScan=sort(expParams.timeScan);
 expParams.timePreStim=sort(expParams.timePreStim);
@@ -520,7 +529,7 @@ rmsBeepThresh = expParams.rmsBeepThresh;
 % nonSpeechDelay = .75; % initial estimate of time between go signal and voicing start
 nonSpeechDelay = .5; % initial estimate of time between go signal and voicing start
 
-% set up figure for real-time plotting of audio signal of next trial
+%% set up figure for real-time plotting of audio signal of next trial
 rtfig = figure('units','norm','position',[.1 .2 .4 .5],'menubar','none');
 micSignal = plot(nan,nan,'-', 'Color', [0 0 0.5]);
 micLine = xline(0, 'Color', [0.984 0.352 0.313], 'LineWidth', 3);
@@ -594,6 +603,10 @@ elseif expParams.scan && expParams.prescan && CMRR
     pause(expParams.timeScan(1)+0.1);
     fprintf('\nPrescans complete\n\n');
 end
+
+
+%% set up timing, stim trialdata, silent file
+
 pause(1);
 save(Output_name, 'expParams');
 
@@ -614,27 +627,26 @@ set(anno_stim.Stim, 'Visible','on');
 while ~isDone(sileread); 
     sound=sileread();
     headwrite(sound);
-end;
+end
 release(sileread);
 reset(headwrite);
 
 ok=ManageTime('wait', CLOCKp, TIME_PREPARE_END+2);
 set(anno_stim.Stim, 'Visible','off');     % Turn off preparation page
 CLOCK=[];                               % Main clock (not yet started)
-
-%%% AM note - sets trial duration of baseline trials to jittered time between timeMax(1) and (2)
-%%% ... by setting this jitter outside of the trial loop, we fix a single baseline pre-GO time for all trials in this run
-%%% ... whereas jitter is recalculated on every trial for speech trials
-expParams.timeNULL = expParams.timeMax(1) + diff(expParams.timeMax).*rand;
 intvs = [];
 
 %% LOOP OVER TRIALS
 for itrial = 1:expParams.ntrials
 
-    %% trial specific timing parameters with jitter on
-
+    %% trial-specific timing parameters with jitter on
+    %
     % time when the question is asked [either by questioner or by audio file playback]
-    trialData(itrial).timeStim = expParams.timeStim(1) + diff(expParams.timeStim).*rand; 
+    if ~trials.basetrial(itrial)
+        trialData(itrial).timeStim = expParams.timeStim(1) + diff(expParams.timeStim).*rand; 
+    elseif trials.basetrial(itrial)
+        trialData(itrial).timeStim = 0; % skip stimulus period if it's a baseline trial
+    end
 
     % time after voice onset we record
     trialData(itrial).timePostOnset = expParams.timePostOnset(1) + diff(expParams.timePostOnset).*rand; 
@@ -654,7 +666,7 @@ for itrial = 1:expParams.ntrials
     % time we wait for voice onset and stop the current trial post this
     trialData(itrial).timeNoOnset = expParams.timeNoOnset(1) + diff(expParams.timeNoOnset).*rand; 
 
-    %%
+    %% show trial info to questioner, handle camera view
     trialData(itrial).question = trials.question{itrial};
     stimread = trials.question{itrial}; 
 
@@ -682,6 +694,8 @@ for itrial = 1:expParams.ntrials
     % block camera if it's a basetrial and if the blocker is enabled
     hfig_cam_blocker.Visible = cam_blocker_state; 
 
+    %% stimulus period of trial
+    %
     % if scanning, end recording 250ms before scan trigger
     %%% the 'preparScan' value will subtracted from timeMax to get the final recordLen value
     prepareScan=0.250*(expParams.scan~=0); 
@@ -745,9 +759,10 @@ for itrial = 1:expParams.ntrials
     set(anno_qustnr.Plus, 'Visible','off');        
     set(anno_qustnr.Stim, 'color', 'w');
     
-    % determine what to display
+    %% show ortho stim and/or play audio stim, if applicable 
+    % determine what to display - cross or question ortho
     if expParams.show_question_orthography
-        % Display the orthography stimulus as normal
+        % Display the orthography stimulus
         set(anno_stim.Stim, 'String', stimread);
         set(anno_stim.Stim, 'Visible', 'On');
     elseif ~expParams.show_question_orthography
@@ -782,12 +797,14 @@ for itrial = 1:expParams.ntrials
     end
 
     % stimulus ends.... called TIME_TEXT_END in other versions of FLVoice_run like SEQM
-    TIME_QUESTION_END = TIME_TEXT_ACTUALLYSTART + trialData(itrial).timeStim;           
+    TIME_QUESTION_END = TIME_TEXT_ACTUALLYSTART + trialData(itrial).timeStim;  
 
-    %%%%%%%% timing warnings
+        %%%%%%%% timing warnings
     if show_timing_warnings
-        if ~ok, fprintf('i am late for this trial TIME_TEXT_END\n'); end
+        if ~ok, fprintf('i am late for this trial TIME_QUESTION_END\n'); end
     end
+
+    %% after stimulus
     TIME_GOSIGNAL_START = TIME_QUESTION_END;          % GO signal time
     set(micLine,'visible','off');set(micLineB,'visible','off');drawnow;
         
@@ -832,8 +849,9 @@ for itrial = 1:expParams.ntrials
     % reaction time
     TIME_VOICE_START = TIME_GOSIGNAL_ACTUALLYSTART + nonSpeechDelay;       % expected voice onset time
 
-    TIME_SCAN_START = TIME_GOSIGNAL_ACTUALLYSTART + ~trials.basetrial(itrial) * trialData(itrial).timeMax...
-        + (1-trials.basetrial(itrial))*expParams.timeNULL;
+    TIME_SCAN_START = TIME_GOSIGNAL_ACTUALLYSTART ...
+        + ~trials.basetrial(itrial) * trialData(itrial).timeMax... % if speech trial, wait timeMax after go cue to scan
+        + trials.basetrial(itrial) * expParams.timeNULL; % if baseline trial, wait timeNULL after go cue to scan
 
     endSamples = trials.basetrial(itrial) * nSamples + (1-trials.basetrial(itrial))*nSamplesNULL;
     while endIdx < endSamples
