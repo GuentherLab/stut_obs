@@ -866,12 +866,16 @@ for itrial = 1:expParams.ntrials
     end
 
     %% voice detection
+    % the purpose of this section is to decide when TIME_SCAN_START will occur for later sections
+    %  - in speech trials, TIME_SCAN_START will be a fixed delay after speech onset; speech onset gets detected here
+    %  - in baseline trials, TIME_SCAN_START will be a fixed delay after TIME_GOSIGNAL_ACTUALLYSTART from the prior section
+    
     % reaction time
     TIME_VOICE_START = TIME_GOSIGNAL_ACTUALLYSTART + nonSpeechDelay;       % expected voice onset time
 
     TIME_SCAN_START = TIME_GOSIGNAL_ACTUALLYSTART ...
         + ~trials.basetrial(itrial) * trialData(itrial).timeMax... % if speech trial, wait timeMax after go cue to scan
-        + trials.basetrial(itrial) * expParams.timeNULL; % if baseline trial, wait timeNULL after go cue to scan
+        + trials.basetrial(itrial) * expParams.timeNULL; % if baseline trial, wait timeNULL after "go cue" (not actually presented) to scan
 
     endSamples = trials.basetrial(itrial) * nSamples + (1-trials.basetrial(itrial))*nSamplesNULL;
     while endIdx < endSamples
