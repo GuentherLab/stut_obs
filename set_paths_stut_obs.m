@@ -57,6 +57,11 @@ else % analyzing on a local machine
             %%dirs.spm = [pkgdir filesep 'spm12']; ADD
             %%dirs.conn = [pkgdir filesep 'conn']; ADD
 
+        case {'677-GUE-WL-0009'} % Guenther Lab SEQ laptop for use at CNC scanner
+            dirs.data = 'C:\Users\splab\Documents\ieeg_stut'; 
+            dirs.projrepo = 'C:\Users\splab\Documents\GitHub\stut_obs'; 
+            dirs.spm = 'C:\Users\splab\Documents\MATLAB\spm12'; 
+            dirs.conn = 'C:\Users\splab\Documents\conn'; 
         otherwise
             disp('Directory listings are not set up for this computer. Please check that your hostname is correct.');
             return
@@ -67,7 +72,7 @@ end
 
 
 %% paths common to all hosts
-% ...... these don't all need to be added to the path; save for later reference
+% ...... these don't all need to be added to the path; some are saved for later reference
 
 % stimuli
 dirs.stim = [dirs.projrepo, filesep, 'stimuli'];
