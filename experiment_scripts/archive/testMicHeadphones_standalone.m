@@ -9,9 +9,6 @@ system(sprintf('wmic process where processid=%d call setpriority "high priority"
 HW_testing = false;
 
 beepoffset = 0.100;
-num_run_digits = 2; % number of digits to include in run number labels in filenames; probably should be 2
-default_fontsize = 12;
-
 % INPUT:
 %    [root]/sub-[subject]/ses-[session]/beh/[task]/sub-[subject]_ses-[session]_run-[run]_task-[task]_desc-stimulus.txt     : INPUT list of stimulus NAMES W/O suffix (one trial per line; enter the string NULL or empty audiofiles for NULL -no speech- conditions)
 %    [root]/sub-[subject]/ses-[session]/beh/[task]/sub-[subject]_ses-[session]_run-[run]_task-[task]_desc-conditions.txt   : (optional) INPUT list of condition labels (one trial per line)
@@ -47,18 +44,24 @@ default_fontsize = 12;
 %
 %
 % FLVOICE_RUN(option_name1, option_value1, ...)
-% specifies additional options:% for audio stim shared across subjects
+% specifies additional options:
+%       visual                      : type of visual presentation ['figure']
 %       root                        : root directory [pwd]
+%       audiopath                   : directory for audio stimuli [pwd/stimuli/audio/Adults]
+%       figurespath                 : directory for visual stimuli [pwd/stimuli/figures/Adults]
 %       subject                     : subject ID ['TEST01']
 %       session                     : session number [1]
 %       run                         : run number [1]
-%       task                        : task name ['jackson20']
+%       task                        : task name ['test']
+%       gender                      : subject gender ['unspecified']
 %       scan                        : true/false include scanning segment in experiment sequence [1] 
+%       timePostStim                : time (s) from end of the audio stimulus presentation to the GO signal (D1 in schematic above) (one value for fixed time, two values for minimum-maximum range of random times) [.25 .75] 
 %       timePostOnset               : time (s) from subject's voice onset to the scanner trigger (or to pre-stimulus segment, if scan=false) (D2 in schematic above) (one value for fixed time, two values for minimum-maximum range of random times) [4.5] 
-%       timeMax                     : maximum time (s) between GO signal and scanner trigger (or to pre-stimulus segment, if scan=false) (D3 in schematic above) (recording portion in a trial may end before this if necessary to start scanner) [5.5] 
-%       timeMaxBaseline             : duration range (s) between 'GO onset' [trial start] and scan start for baseline trials
+%       timeMax                     : maximum time (s) before GO signal and scanner trigger (or to pre-stimulus segment, if scan=false) (D3 in schematic above) (recording portion in a trial may end before this if necessary to start scanner) [5.5] 
 %       timeScan                    : (if scan=true) duration (s) of scan (D4 in schematic above) (one value for fixed time, two values for minimum-maximum range of random times) [1.6] 
 %       timePreStim                 : time (s) from end of scan to start of next trial stimulus presentation (D5 in schematic above) (one value for fixed time, two values for minimum-maximum range of random times) [.25] 
+%       timePreSound                : time (s) from start of orthographic presentation to the start of sound stimulus (D6 in schematic above) [.5]
+%       timePostSound               : time (s) from end of sound stimulus to the end of orthographic presentation (D7 in schematic above) [.47]
 %       minVoiceOnsetTime           : time (s) to exclude from onset detection (use when beep sound is recorded)
 %       prescan                     : (if scan=true) true/false include prescan sequence at the beginning of experiment [1] 
 %       rmsThresh                   : voice onset detection: initial voice-onset root-mean-square threshold [.02]
@@ -72,112 +75,51 @@ default_fontsize = 12;
 %       deviceScan                  : device name for scanner trigger (see audiodevinfo().output.Name for details)
 %
 
-%% load config parameters from file
-close all force; ET = tic;
-[dirs, host] = set_paths_stut_obs(); % set project paths and get computer name
+global FLAG_CONT_TO_NXT
 
-% set priority for matlab to high for running experiments
-system(sprintf('wmic process where processid=%d call setpriority "high priority"', feature('getpid')));
+ET = tic;
+if ispc, [nill,host]=system('hostname');
+else [nill,host]=system('hostname -f');
+end
+host=regexprep(host,'\n','');
 
-% select json files
-preFlag = false;
-expRead = {};
-
-% if only 1 varargin was provided and it's not an empty string, treat it as the name of a config file in the config dir
-if numel(varargin) == 1 && ~isempty(varargin{1})
-    config_file = [dirs.config, filesep, varargin{1}, '.json']; 
-    assert(exist(config_file), 'unable to find input config file %s',config_file);
-    expRead=spm_jsonread(config_file);
-else % if no config filename provided, open menu to select one
-    presfig=dialog('units','norm','position',[.3,.3,.3,.1],'windowstyle','normal','name','Load preset parameters','color','w','resize','on');
-    uicontrol(presfig,'style','text','units','norm','position',[.05, .475, .6, .35],...
-        'string','Select preset exp config file (.json):','backgroundcolor','w','fontsize',default_fontsize-2,'fontweight','bold','horizontalalignment','left');
-    prePath=uicontrol('Style', 'edit','Units','norm','FontUnits','norm','FontSize',0.5,'HorizontalAlignment', 'left','Position',[.55 .55 .3 .3],'Parent',presfig);
-    preBrowse=uicontrol('Style', 'pushbutton','String','Browse','Units','norm','FontUnits','norm','FontSize',0.5,...
-        'Position',[.85 .55 .15 .3],'Parent',presfig, 'Callback',@preCall1);
-    preConti=uicontrol('Style', 'pushbutton','String','Continue','Units','norm','FontUnits','norm','FontSize',0.5, ...
-        'Position',[.3 .12 .15 .3],'Parent',presfig, 'Callback',@preCall2);
-    preSkip=uicontrol('Style', 'pushbutton','String','Skip','Units','norm','FontUnits','norm','FontSize',0.5,...
-        'Position',[.55 .12 .15 .3],'Parent',presfig, 'Callback','uiresume');
-    
-    uiwait(presfig);
-    ok=ishandle(presfig);
-    if ~ok, return; end
-    delete(presfig);
+if strcmp(host, '677-GUE-WL-0009')
+    default_fontsize = 10;
+else
+    default_fontsize = 15;
 end
 
-
-% function that gets json files
-function preCall1(varargin)
-    [fileName, filePath] = uigetfile([dirs.config, filesep, '*.json'], 'Select .json file'); 
-    fileFull = [filePath fileName];
-    if isequal(fileName,0)
-        return
-    else
-        set(prePath, 'String', fileFull);
-    end
-end
-
-% checks if file paths exist
-function preCall2(varargin)
-    path = get(prePath, 'String');
-    assert(~isempty(dir(path)), 'unable to find input config file %s',path);
-    if ~isempty(dir(path))
-        expRead=spm_jsonread(path);
-        uiresume;
-        preFlag = true;
-    end
-end
-
-
-%% make expParams parameters structure, look for audio devices
 % create structure to save experimental parameters
-if preFlag
-    expParams = expRead;
-else % if no preset config file defined
-    expParams=struct(...
-        'root', 'C:\ieeg_stut', ...
-        'subject','example',...
-        'session', 1, ...
-        'run', 1,...
-        'scan', true, ...
-        'play_question_audio_stim',false,... % play (unobserved condition) or don't play (observed condition) the audio quesiton stim
-        'repetitions_per_unique_qa', 2, ...
-        'shuffle_qa_order', true, ... % specifically affects stim order, not baseline trials
-        'max_unique_qa_repeats',2, ... % max consecutive repeats of a given QA stim, before baseline trials are mixed in
-        'baseline_trials_proportion',0.5,... % proportion of all trials that are baseline trials
-        'baseline_trials_evenly_spaced',true,.... % whether baseline trals are evenly spaced or shuffled
-        'max_basetrial_repeats',2,... % don't let there be more than this many no-speech trials in row
-        'cover_camera_when_nospeech',true, ... % cover the left side of screen w/ figure where camera is outside of speech epochs
-        'show_question_orthography', false, ...
-        'timeStim', [3 3.5],...
-        'timePostOnset', 3.5,...
-        'timePreStim', 0.5,...
-        'timeMax', 6.5, ...
-        'timeMaxBaseline', [5.5 6.5],... % duration range (s) between 'GO onset' [trial start] and scan start for baseline trials
-        'timeNoOnset', 3.0, ...
-        'timeScan', 1.6, ...
-        'rmsThresh', .02,... %'rmsThresh', .05,...
-        'rmsBeepThresh', .1,...
-        'rmsThreshTimeOnset', .02,...% 'rmsThreshTimeOnset', .10,...
-        'rmsThreshTimeOffset', [.25 .25],...
-        'prescan', true, ...
-        'minVoiceOnsetTime', 0.4, ...
-        'ipatDur', 5.00,...         %   prescan IPAT duration
-        'smsDur', 7,...             %   prescan SMS duration
-        'deviceMic','Analogue 1 + 2 (2- Focusrite USB Audio)',... % subject microphone
-        'deviceHead','Speakers (2- Focusrite USB Audio)', ... % audio output to subject (headphones or speaker)
-        'deviceScan','Playback 3 + 4 (2- Focusrite USB Audio)', ... % audio channel to send triggers to scanner
-        'rectWidthProp', 0.8, ...      % rectangle width as proportion of screen width
-        'rectHeightProp', 0.6, ...     % rectangle height as proportion of screen height  
-        'rectColor', [0 1 0], ...      % RGB color of rectangle [R G B] (0-1 scale)
-        'task', 'jackson20' ...
-        );
-end
+expParams=struct(...
+    'visual', 'fixpoint', ...
+    'root', pwd, ...
+    'audiopath', fullfile(pwd, 'stimuli', 'audio'), ...
+    'subject','TEST01',...
+    'session', 1, ...
+    'run', 1,...
+    'task', 'test', ...
+    'gender', 'unspecified', ...
+    'scan', false, ...
+    'timePostStim', [.25 .75],...
+    'timePostOnset', 4.5,...
+    'timeScan', 1.6,...
+    'timePreStim', .25,...
+    'timeMax', 5.5, ...
+    'timePreSound', 0, ...
+    'timePostSound', 0, ...
+    'rmsThresh', .02,... %'rmsThresh', .05,...
+    'rmsBeepThresh', .1,...
+    'rmsThreshTimeOnset', .02,...% 'rmsThreshTimeOnset', .10,...
+    'rmsThreshTimeOffset', [.25 .25],...
+    'prescan', true, ...
+    'minVoiceOnsetTime', 0.4, ...
+    'ipatDur', 4.75,...         %   prescan IPAT duration
+    'smsDur', 7,...             %   prescan SMS duration
+    'deviceMic','',...
+    'deviceHead','',...
+    'deviceScan','');
 
 expParams.computer = host;
-expParams.audio_common_path = dirs.audio_common; % for audio stim shared across subjects
-expParams.recordingToScanBuffer = 0.25; % end the audio recording of subject mic this early (sec) to give buffer before scan trigger
 expParams.type = 'regular';
 expParams.proj = '';
 
@@ -211,14 +153,132 @@ else
     tgind = find(contains(strOUTPUT, 'Playback')&contains(strOUTPUT, 'Focusrite'));
 end
 
+% strVisual={'figure', 'fixpoint', 'orthography'};
+% 
+% % GUI for user to modify options
+% fnames=fieldnames(expParams);
+% fnames=fnames(~ismember(fnames,{'visual', 'root', 'audiopath', 'figurespath', 'subject', 'session', 'run', 'task', 'gender', 'scan', 'deviceMic','deviceHead','deviceScan'}));
+% for n=1:numel(fnames)
+%     val=expParams.(fnames{n});
+%     if ischar(val), fvals{n}=val;
+%     elseif isempty(val), fvals{n}='';
+%     else fvals{n}=mat2str(val);
+%     end
+% end
+% 
+% out_dropbox = {'visual', 'root', 'audiopath', 'figurespath', 'subject', 'session', 'run', 'task', 'gender', 'scan'};
+% for n=1:numel(out_dropbox)
+%     val=expParams.(out_dropbox{n});
+%     if ischar(val), fvals_o{n}=val;
+%     elseif isempty(val), fvals_o{n}='';
+%     else fvals_o{n}=mat2str(val);
+%     end
+% end
+% 
+% default_width = 0.04; %0.08;
+% default_intvl = 0.05; %0.10;
+% 
+% thfig=dialog('units','norm','position',[.3,.3,.3,.5],'windowstyle','normal','name','FLvoice_run options','color','w','resize','on');
+% uicontrol(thfig,'style','text','units','norm','position',[.1,.92,.8,default_width],'string','Experiment information:','backgroundcolor','w','fontsize',default_fontsize,'fontweight','bold');
+% 
+% ht_txtlist = {};
+% ht_list = {};
+% for ind=1:size(out_dropbox,2)
+%     ht_txtlist{ind} = uicontrol(thfig,'style','text','units','norm','position',[.1,.75-(ind-3)*default_intvl,.35,default_width],'string',[out_dropbox{ind}, ':'],'backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
+%     if strcmp(out_dropbox{ind}, 'visual')
+%         ht_list{ind} = uicontrol(thfig,'style','popupmenu','units','norm','position',[.5,.75-(ind-3)*default_intvl,.4,default_width],'string', strVisual, 'value',find(strcmp(strVisual, expParams.visual)),'fontsize',default_fontsize-1,'callback',@thfig_callback4);
+%     else
+%         ht_list{ind} = uicontrol(thfig,'style','edit','units','norm','position',[.5,.75-(ind-3)*default_intvl,.4,default_width],'string', fvals_o{ind}, 'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1,'callback',@thfig_callback3);
+%     end
+% end
+% 
+% ht1=uicontrol(thfig,'style','popupmenu','units','norm','position',[.1,.75-8*default_intvl,.4,default_width],'string',fnames,'value',1,'fontsize',default_fontsize-1,'callback',@thfig_callback1);
+% ht2=uicontrol(thfig,'style','edit','units','norm','position',[.5,.75-8*default_intvl,.4,default_width],'string','','backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1,'callback',@thfig_callback2);
+% 
+% uicontrol(thfig,'style','text','units','norm','position',[.1,.75-9*default_intvl,.35,default_width],'string','Microphone:','backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
+% ht3a=uicontrol(thfig,'style','popupmenu','units','norm','position',[.5,.75-9*default_intvl,.4,default_width],'string',strINPUT,'value',ipind,'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1);
+% 
+% uicontrol(thfig,'style','text','units','norm','position',[.1,.75-10*default_intvl,.35,default_width],'string','Sound output:','backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
+% ht3b=uicontrol(thfig,'style','popupmenu','units','norm','position',[.5,.75-10*default_intvl,.4,default_width],'string',strOUTPUT,'value',opind,'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1);
+% 
+% ht3c0=uicontrol(thfig,'style','text','units','norm','position',[.1,.75-11*default_intvl,.35,default_width],'string','Scanner trigger:','backgroundcolor','w','fontsize',default_fontsize-1,'fontweight','bold','horizontalalignment','right');
+% ht3c=uicontrol(thfig,'style','popupmenu','units','norm','position',[.5,.75-11*default_intvl,.4,default_width],'string',strOUTPUT,'value',tgind,'backgroundcolor',1*[1 1 1],'fontsize',default_fontsize-1);
+% 
+% uicontrol(thfig,'style','pushbutton','string','Start','units','norm','position',[.1,.01,.38,.10],'callback','uiresume','fontsize',default_fontsize-1);
+% uicontrol(thfig,'style','pushbutton','string','Cancel','units','norm','position',[.51,.01,.38,.10],'callback','delete(gcbf)','fontsize',default_fontsize-1);
+% if ~expParams.scan, set([ht3c0,ht3c],'visible','off'); end
+% ind2 = find(strcmp(out_dropbox, 'figurespath'));
+% if ~strcmp(expParams.visual, 'figure'), set([ht_txtlist{ind2}, ht_list{ind2}], 'visible', 'off'); end
+% 
+% 
+% thfig_callback1;
+%     function thfig_callback1(varargin)
+%         tn=get(ht1,'value');
+%         set(ht2,'string',fvals{tn});
+%     end
+%     function thfig_callback2(varargin)
+%         tn=get(ht1,'value');
+%         fvals{tn}=get(ht2,'string');
+%     end
+%     function thfig_callback3(varargin)
+%         for tn=1:size(out_dropbox,2)
+%             if strcmp(out_dropbox{tn}, 'visual'), continue; end
+%             fvals_o{tn}=get(ht_list{tn}, 'string');
+%             if strcmp(out_dropbox{tn},'scan')
+%                 if isequal(str2num(fvals_o{tn}),0), set([ht3c0,ht3c],'visible','off'); 
+%                 else set([ht3c0,ht3c],'visible','on'); 
+%                 end
+%             end
+%         end
+%     end
+%     function thfig_callback4(varargin)
+%         ind = find(strcmp(out_dropbox, 'visual'));
+%         choice=get(ht_list{ind}, 'value');
+%         fvals_o{ind}=strVisual{choice};
+%         ind2 = find(strcmp(out_dropbox, 'figurespath'));
+%         if ~strcmp(strVisual{choice}, 'figure')
+%             set([ht_txtlist{ind2}, ht_list{ind2}], 'visible', 'off'); 
+%         else 
+%             set([ht_txtlist{ind2}, ht_list{ind2}], 'visible', 'on');
+%         end
+%     end
+% 
+% uiwait(thfig);
+% ok=ishandle(thfig);
+% if ~ok, return; end
 
+
+% expParams.deviceMic=strINPUT{get(ht3a,'value')};
+% expParams.deviceHead=strOUTPUT{get(ht3b,'value')};
+% expParams.deviceScan=strOUTPUT{get(ht3c,'value')};
 
 expParams.deviceMic=strINPUT{ipind};
 expParams.deviceHead=strOUTPUT{opind};
 expParams.deviceScan=strOUTPUT{tgind};
 
+
+% delete(thfig);
+% for n=1:numel(fnames)
+%     val=fvals{n};
+%     if ischar(expParams.(fnames{n})), expParams.(fnames{n})=val;
+%     elseif isempty(val), expParams.(fnames{n})=[];
+%     else
+%         assert(~isempty(str2num(val)),'unable to interpret string %s',val);
+%         expParams.(fnames{n})=str2num(val);
+%     end
+% end
+% for n=1:numel(out_dropbox)
+%     val=fvals_o{n};
+%     if ischar(expParams.(out_dropbox{n})), expParams.(out_dropbox{n})=val;
+%     elseif isempty(val), expParams.(out_dropbox{n})=[];
+%     else
+%         assert(~isempty(str2num(val)),'unable to interpret string %s',val);
+%         expParams.(out_dropbox{n})=str2num(val);
+%     end
+% end
+
 % visual setup
-if expParams.show_question_orthography
+if strcmp(expParams.visual, 'figure')
     annoStr = setUpVisAnnot_HW([1 1 1]);
 else
     annoStr = setUpVisAnnot_HW([0 0 0]);
@@ -230,27 +290,81 @@ set(annoStr.Stim, 'String', 'Preparing...');
 set(annoStr.Stim, 'Visible','on');
 
 
+% 
+% % locate files
+% filepath = fullfile(expParams.root, sprintf('sub-%s',expParams.subject), sprintf('ses-%d',expParams.session),'beh', expParams.task);
+% Input_audname  = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%d_task-%s_desc-stimulus.txt',expParams.subject, expParams.session, expParams.run, expParams.task));
+% Input_condname  = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%d_task-%s_desc-conditions.txt',expParams.subject, expParams.session, expParams.run, expParams.task));
+% Output_name = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%d_task-%s_desc-audio.mat',expParams.subject, expParams.session, expParams.run, expParams.task));
+% assert(~isempty(dir(Input_audname)), 'unable to find input file %s',Input_audname);
+% if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite', questdlg('This subject already has an data file for this session/run/task, do you want to over-write?','Answer', 'Yes - overwrite', 'No - quit','No - quit')), return; end
+% % read audio files and condition labels
+% Input_files=regexp(fileread(Input_audname),'[\n\r]+','split');
+% 
+% Input_files_temp=Input_files(cellfun('length',Input_files)>0);
+% NoNull = find(~strcmp(Input_files_temp, 'NULL'));
+% 
+% if ispc
+%     Input_files=arrayfun(@(x)fullfile(expParams.audiopath, expParams.task, strcat(strrep(x, '/', '\'), '.wav')), Input_files_temp);
+% else
+%     Input_files=arrayfun(@(x)fullfile(expParams.audiopath, expParams.task, strcat(x, '.wav')), Input_files_temp);
+% end
+% 
+% 
+% if strcmp(expParams.visual, 'figure')
+%     All_figures_str = dir(fullfile(expParams.figurespath, '*.png'));
+%     All_figures = arrayfun(@(x)fullfile(All_figures_str(x).folder, All_figures_str(x).name), 1:length(All_figures_str), 'uni', 0);
+%     figures=arrayfun(@(x)fullfile(expParams.figurespath, strcat(x, '.png')), Input_files_temp);
+%     figureseq=arrayfun(@(x)find(strcmp(All_figures, x)), figures, 'uni', 0);
+%     if sum(arrayfun(@(x)isempty(figureseq{x}), 1:length(figureseq))) ~= 0
+%         disp('Some images not found or image names don''t match');
+%         return
+%     end
+% end
 
-audiofile = [dirs.audio_common, filesep, 'q_female_name.mp3'];
-[Input_sound{1}, Input_fs{1}]=audioread(audiofile);
+stipath = fullfile(expParams.audiopath, 'nr', 'NRT_CTOPP_Prac_1.wav');
+[Input_sound{1}, Input_fs{1}]=audioread(stipath);
 Input_conditions = {'NRT_CTOPP_Prac_1'};
 
 
-% % % % % % % % % % % if expParams.show_question_orthography
-% % % % % % % % % % %     All_figures_str = dir(fullfile(expParams.figurespath, '*.png'));
-% % % % % % % % % % %     All_figures = arrayfun(@(x)fullfile(All_figures_str(x).folder, All_figures_str(x).name), 1:length(All_figures_str), 'uni', 0);
-% % % % % % % % % % %     figures=arrayfun(@(x)fullfile(expParams.figurespath, strcat(x, '.png')), Input_files_temp);
-% % % % % % % % % % %     figureseq=arrayfun(@(x)find(strcmp(All_figures, x)), figures, 'uni', 0);
-% % % % % % % % % % %     if sum(arrayfun(@(x)isempty(figureseq{x}), 1:length(figureseq))) ~= 0
-% % % % % % % % % % %         disp('Some images not found or image names don''t match');
-% % % % % % % % % % %         return
-% % % % % % % % % % %     end
-% % % % % % % % % % % end
-stimreads{1}=dsp.AudioFileReader(audiofile, 'SamplesPerFrame', 2048);
-sileread = dsp.AudioFileReader([expParams.audio_common_path, filesep, 'silent.wav'], 'SamplesPerFrame', 2048);
+if strcmp(expParams.visual, 'figure')
+    All_figures_str = dir(fullfile(expParams.figurespath, '*.png'));
+    All_figures = arrayfun(@(x)fullfile(All_figures_str(x).folder, All_figures_str(x).name), 1:length(All_figures_str), 'uni', 0);
+    figures=arrayfun(@(x)fullfile(expParams.figurespath, strcat(x, '.png')), Input_files_temp);
+    figureseq=arrayfun(@(x)find(strcmp(All_figures, x)), figures, 'uni', 0);
+    if sum(arrayfun(@(x)isempty(figureseq{x}), 1:length(figureseq))) ~= 0
+        disp('Some images not found or image names don''t match');
+        return
+    end
+end
+stimreads{1}=dsp.AudioFileReader(stipath, 'SamplesPerFrame', 2048);
+% ok=cellfun(@(x)exist(x,'file'), Input_files(NoNull));
+% assert(all(ok), 'unable to find files %s', sprintf('%s ',Input_files{NoNull(~ok)}));
+% dirFiles=cellfun(@dir, Input_files(NoNull), 'uni', 0);
+% NoNull=NoNull(cellfun(@(x)x.bytes>0, dirFiles));
+% Input_sound=cell(size(Input_files));
+% Input_fs=num2cell(ones(size(Input_files)));
+% [Input_sound(NoNull),Input_fs(NoNull)]=cellfun(@audioread, Input_files(NoNull),'uni',0);
+% [silent_sound,silent_fs]=audioread(fullfile(expParams.audiopath, 'silent.wav'));
+% stimreads=cell(size(Input_files));
+% stimreads(NoNull)=cellfun(@(x)dsp.AudioFileReader(x, 'SamplesPerFrame', 2048),Input_files(NoNull),'uni',0);
+% stimreads(setdiff(1:numel(stimreads), NoNull))=arrayfun(@(x)dsp.AudioFileReader(fullfile(expParams.audiopath, 'silent.wav'), 'SamplesPerFrame', 2048),1:numel(Input_files(setdiff(1:numel(stimreads), NoNull))),'uni',0);
+sileread = dsp.AudioFileReader(fullfile(expParams.audiopath, 'silent.wav'), 'SamplesPerFrame', 2048);
 
+% if isempty(dir(Input_condname))
+%     [nill,Input_conditions]=arrayfun(@fileparts,Input_files,'uni',0);
+% else
+%     Input_conditions=regexp(fileread(Input_condname),'[\n\r]+','split');
+%     Input_conditions=Input_conditions(cellfun('length',Input_conditions)>0);
+%     assert(numel(Input_files)==numel(Input_conditions),'unequal number of lines/trials in %s (%d) and %s (%d)',Input_audname, numel(Input_files), Input_condname, numel(Input_conditions));
+% end
 expParams.numTrials = length(Input_conditions); % pull out the number of trials from the stimList
 
+% Input_duration=cellfun(@(a,b)numel(a)/b, Input_sound, Input_fs);
+% meanInput_duration=mean(Input_duration(Input_duration>0));
+% [Input_sound{Input_duration==0}]=deal(zeros(ceil(44100*meanInput_duration),1)); % fills empty audiofiles with average-duration silence ('NULL' CONDITIONS)
+% [Input_fs{Input_duration==0}]=deal(44100);
+% [Input_conditions{Input_duration==0}]=deal('NULL');
 
 % create random number stream so randperm doesn't call the same thing everytime when matlab is opened
 s = RandStream.create('mt19937ar','seed',sum(100*clock));
@@ -310,14 +424,17 @@ end
 % checks values of timing variables
 expParams.beepoffset = beepoffset;
 
+assert(all(isfinite(expParams.timePostStim))&ismember(numel(expParams.timePostStim),[1,2]), 'timePostStim field must have one or two elements');
 assert(all(isfinite(expParams.timePostOnset))&ismember(numel(expParams.timePostOnset),[1,2]), 'timePostOnset field must have one or two elements');
 assert(all(isfinite(expParams.timeScan))&ismember(numel(expParams.timeScan),[1,2]), 'timeScan field must have one or two elements');
 assert(all(isfinite(expParams.timePreStim))&ismember(numel(expParams.timePreStim),[1,2]), 'timePreStim field must have one or two elements');
 assert(all(isfinite(expParams.timeMax))&ismember(numel(expParams.timeMax),[1,2]), 'timeMax field must have one or two elements');
+if numel(expParams.timePostStim)==1, expParams.timePostStim=expParams.timePostStim+[0 0]; end
 if numel(expParams.timePostOnset)==1, expParams.timePostOnset=expParams.timePostOnset+[0 0]; end
 if numel(expParams.timeScan)==1, expParams.timeScan=expParams.timeScan+[0 0]; end
 if numel(expParams.timePreStim)==1, expParams.timePreStim=expParams.timePreStim+[0 0]; end
 if numel(expParams.timeMax)==1, expParams.timeMax=expParams.timeMax+[0 0]; end
+expParams.timePostStim=sort(expParams.timePostStim);
 expParams.timePostOnset=sort(expParams.timePostOnset);
 expParams.timeScan=sort(expParams.timeScan);
 expParams.timePreStim=sort(expParams.timePreStim);
@@ -346,8 +463,33 @@ set(conti,'visible','off');
 
 % set up picture display
 
-% % % % % % % % % % % % % if expParams.show_question_orthography, imgBuf = arrayfun(@(x)imread(All_figures{x}), 1:length(All_figures),'uni',0); end
+if strcmp(expParams.visual, 'figure'), imgBuf = arrayfun(@(x)imread(All_figures{x}), 1:length(All_figures),'uni',0); end
     
+% %% pre scans
+% if expParams.scan && expParams.prescan
+%     fprintf('\nStarting prescans\n');
+%     psTime = tic;
+%     fprintf('\nPrescan IPAT 1, duration %.2f seconds\n', expParams.ipatDur);
+%     play(triggerPlayer)
+%     toc(psTime);
+%     pause(expParams.ipatDur);
+%     fprintf('\nPrescan IPAT 2, duration %.2f seconds\n', expParams.ipatDur);
+%     play(triggerPlayer)
+%     toc(psTime);
+%     pause(expParams.ipatDur);
+%     fprintf('\nPrescan SMS, duration %.2f seconds\n', expParams.smsDur);
+%     play(triggerPlayer)
+%     toc(psTime);
+%     pause(expParams.smsDur);
+%     fprintf('\nPrescan dummy scan 1, duration %.2f seconds\n', expParams.timeScan(1));
+%     play(triggerPlayer)
+%     toc(psTime);
+%     pause(expParams.timeScan(1));
+%     fprintf('\nPrescans complete\n\n');
+% end
+% pause(1);
+% save(Output_name, 'expParams');
+
 %Initialize trialData structure
 trialData = struct;
 
@@ -381,10 +523,13 @@ while 1
 %     trialData(ii).display = nm;
 %     trialData(ii).timeStim = numel(Input_sound{ii})/Input_fs{ii}; 
     trialData(ii).timeStim = size(Input_sound{ii},1)/Input_fs{ii}; 
+    trialData(ii).timePostStim = expParams.timePostStim(1) + diff(expParams.timePostStim).*rand; 
     trialData(ii).timePostOnset = expParams.timePostOnset(1) + diff(expParams.timePostOnset).*rand; 
     trialData(ii).timeScan = expParams.timeScan(1) + diff(expParams.timeScan).*rand; 
     trialData(ii).timePreStim = expParams.timePreStim(1) + diff(expParams.timePreStim).*rand; 
     trialData(ii).timeMax = expParams.timeMax(1) + diff(expParams.timeMax).*rand; 
+    trialData(ii).timePostSound = expParams.timePostSound;
+    trialData(ii).timePreSound = expParams.timePreSound;
     %stimPlayer = audioplayer(Input_sound{ii},Input_fs{ii}, 24, stimID);
     stimread = stimreads{ii};
     SpeechTrial=~strcmp(trialData(ii).condLabel,'NULL');
@@ -423,7 +568,10 @@ while 1
     
     ok=ManageTime('wait', CLOCK, TIME_STIM_START);
     TIME_STIM_ACTUALLYSTART = ManageTime('current', CLOCK);
-    if expParams.show_question_orthography
+    if strcmp(expParams.visual, 'figure')
+        set(annoStr.Plus, 'Visible','off');
+        imshow(imgBuf{figureseq{ii}}, 'Parent', annoStr.Pic);
+    elseif strcmp(expParams.visual, 'orthography')
         set(annoStr.Plus, 'Visible','off');
         set(annoStr.Stim, 'String', {trialData(ii).display});
         set(annoStr.Stim, 'Visible','on');
@@ -431,7 +579,7 @@ while 1
     end
     if ~ok, fprintf('i am late for this trial TIME_STIM_START\n'); end
 
-    TIME_SOUND_START = TIME_STIM_ACTUALLYSTART;
+    TIME_SOUND_START = TIME_STIM_ACTUALLYSTART + trialData(ii).timePreSound;
     %ok=ManageTime('wait', CLOCK, TIME_SOUND_START - stimoffset);
     ok=ManageTime('wait', CLOCK, TIME_SOUND_START);
     %for reference: stimPlayer = audioplayer(Input_sound{ii},Input_fs{ii}, 24, stimID);
@@ -442,16 +590,17 @@ while 1
     TIME_SOUND_END = TIME_SOUND_ACTUALLYSTART + trialData(ii).timeStim;           % stimulus ends
     if ~ok, fprintf('i am late for this trial TIME_SOUND_START\n'); end
     
-    TIME_ALLSTIM_END = TIME_SOUND_END;
+    TIME_ALLSTIM_END = TIME_SOUND_END + trialData(ii).timePostSound;
+    %TIME_ALLSTIM_END = TIME_SOUND_RELEASED + trialData(ii).timePostSound;
     ok=ManageTime('wait', CLOCK, TIME_ALLSTIM_END);
-    if expParams.show_question_orthography
+    if strcmp(expParams.visual, 'orthography')
         set(annoStr.Stim, 'Visible','off');
         set(annoStr.Plus, 'Visible','on');
         drawnow;
     end
     if ~ok, fprintf('i am late for this trial TIME_ALLSTIM_END\n'); end        
 
-    TIME_GOSIGNAL_START = TIME_ALLSTIM_END;          % GO signal time
+    TIME_GOSIGNAL_START = TIME_ALLSTIM_END + trialData(ii).timePostStim;          % GO signal time
     set(micLine,'visible','off');set(micLineB,'visible','off');drawnow;
         
     ok=ManageTime('wait', CLOCK, TIME_GOSIGNAL_START - beepoffset);     % waits for recorder initialization time
@@ -464,7 +613,8 @@ while 1
     %TIME_GOSIGNAL_RELEASED = ManageTime('current', CLOCK);
     %TIME_GOSIGNAL_ACTUALLYSTART = TIME_GOSIGNAL_RELEASED - beepdur; % actual time for GO signal 
     TIME_GOSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK); % actual time for GO signal 
-    set(annoStr.Plus, 'color','g');drawnow
+    if strcmp(expParams.visual, 'fixpoint'),set(annoStr.Plus, 'color','g');drawnow;end
+    if strcmp(expParams.visual, 'orthography'),set(annoStr.Plus, 'color','g');drawnow;end
     if ~ok, fprintf('i am late for this trial TIME_GOSIGNAL_START\n'); end
     TIME_VOICE_START = TIME_GOSIGNAL_ACTUALLYSTART + nonSpeechDelay;                   % expected voice onset time
     TIME_SCAN_START = TIME_GOSIGNAL_ACTUALLYSTART + trialData(ii).timeMax;
@@ -525,14 +675,14 @@ while 1
     if SpeechTrial && voiceOnsetDetected == 0, fprintf('warning: voice was expected but not detected (rmsThresh = %f)\n',rmsThresh); end
     release(deviceReader); % end recording
     
-    % % % % % % % % % % % % % % % % % % % % switch expParams.visual
-    % % % % % % % % % % % % % % % % % % % %     case 'fixpoint'
-    % % % % % % % % % % % % % % % % % % % %         set(annoStr.Plus, 'color','w');
-    % % % % % % % % % % % % % % % % % % % %     case 'figure'
-    % % % % % % % % % % % % % % % % % % % %         imshow([], 'Parent', annoStr.Pic);
-    % % % % % % % % % % % % % % % % % % % %     case 'orthography'
-    % % % % % % % % % % % % % % % % % % % %         set(annoStr.Plus, 'color','w');
-    % % % % % % % % % % % % % % % % % % % % end
+    switch expParams.visual
+        case 'fixpoint'
+            set(annoStr.Plus, 'color','w');
+        case 'figure'
+            imshow([], 'Parent', annoStr.Pic);
+        case 'orthography'
+            set(annoStr.Plus, 'color','w');
+    end
     
     if ~FLAG_CONT_TO_NXT
         set(conti,'visible','on');
@@ -543,6 +693,84 @@ while 1
     set(conti,'visible','off');
     set(nexttrl,'visible','off'); 
    
+    %stop(t);
+    %delete(t);
+
+    % %% save voice onset time and determine how much time left before sending trigger to scanner
+    % if voiceOnsetDetected == 0 %if voice onset wasn't detected
+    %     trialData(ii).onsetDetected = 0;
+    %     trialData(ii).voiceOnsetTime = NaN;
+    %     trialData(ii).nonSpeechDelay = nonSpeechDelay;
+    % else
+    %     trialData(ii).onsetDetected = 1;
+    %     trialData(ii).voiceOnsetTime = voiceOnsetTime;
+    %     trialData(ii).nonSpeechDelay = NaN;
+    % end
+
+    % if expParams.scan % note: THIS IS TIME LANDMARK #2: BEGINNING OF SCAN: if needed consider placing this below some or all the plot/save operations below (at this point the code will typically wait for at least ~2s, between the end of the recording to the beginning of the scan)
+    %     %ok = ManageTime('wait', CLOCK, TIME_SCAN_START - trigoffset);
+    %     ok = ManageTime('wait', CLOCK, TIME_SCAN_START);
+    %     %playblocking(triggerPlayer);
+    %     while ~isDone(trigread); sound=trigread();trigwrite(sound);end;reset(trigread);reset(trigwrite);
+    %     %TIME_TRIG_RELEASED=ManageTime('current', CLOCK);
+    %     TIME_SCAN_ACTUALLYSTART=ManageTime('current', CLOCK);
+    %     TIME_SCAN_END = TIME_SCAN_ACTUALLYSTART + trialData(ii).timeScan;
+    %     NEXTTRIAL = TIME_SCAN_END + trialData(ii).timePreStim;
+    %     if ~ok, fprintf('i am late for this trial TIME_SCAN_START\n'); end
+        
+    %     if isnan(trialData(ii).voiceOnsetTime)
+    %         expdur = trialData(ii).timePreSound + trialData(ii).timeStim + trialData(ii).timePostSound +  trialData(ii).timePostStim + trialData(ii).timeMax + trialData(ii).timeScan;
+    %     else
+    %         expdur = trialData(ii).timePreSound + trialData(ii).timeStim + trialData(ii).timePostSound +  trialData(ii).timePostStim + trialData(ii).voiceOnsetTime + trialData(ii).timePostOnset + trialData(ii).timeScan;
+    %     end
+    %     fprintf('\nThis trial elapsed Time: %.3f (s), expected duration: %.3f (s)\n', TIME_SCAN_END - TIME_STIM_START, expdur);
+    % else
+    %     TIME_SCAN_ACTUALLYSTART=nan;
+    %     %TIME_TRIG_RELEASED = nan;
+    %     TIME_SCAN_END = nan;
+    %     NEXTTRIAL = TIME_SCAN_START + trialData(ii).timePreStim;
+    % end
+        
+    % trialData(ii).timingTrial = [TIME_TRIAL_START;TIME_STIM_START;TIME_STIM_ACTUALLYSTART;TIME_SOUND_START;TIME_SOUND_ACTUALLYSTART;TIME_SOUND_END;TIME_ALLSTIM_END;TIME_GOSIGNAL_START;TIME_GOSIGNAL_ACTUALLYSTART;TIME_VOICE_START;TIME_SCAN_START;TIME_SCAN_ACTUALLYSTART;TIME_SCAN_END];
+    % expParams.timingTrialNames = split('TIME_TRIAL_START;TIME_STIM_START;TIME_STIM_ACTUALLYSTART;TIME_SOUND_START;TIME_SOUND_ACTUALLYSTART;TIME_SOUND_END;TIME_ALLSTIM_END;TIME_GOSIGNAL_START;TIME_GOSIGNAL_ACTUALLYSTART;TIME_VOICE_START;TIME_SCAN_START;TIME_SCAN_ACTUALLYSTART;TIME_SCAN_END', ';');
+
+    % TIME_STIM_START = NEXTTRIAL; 
+
+
+%     % adapt rmsThresh
+%     if 1, %isfield(expParams,'voiceCal')&&expParams.voiceCal.threshType == 1
+%         if SpeechTrial   % If the current trial is not a baseline trial
+%             rmsFF=.90; winDur=.002; winSize=ceil(winDur*expParams.sr); % note: match rmsFF and rmsFrameDur values to those in detectVoiceOnset.m
+%             rms=sqrt(mean(reshape(recAudio(1:floor(nSamples/winSize)*winSize),winSize,[]).^2,1));
+%             rms=filter(1,[1 -rmsFF],(1-rmsFF)*rms); % note: just like "rms(1)=0+(1-rmsFF)*rms(1); for n=2:numel(rms), rms(n)=rmsFF*rms(n-1)+(1-rmsFF)*rms(n); end"
+%             if  voiceOnsetDetected    % voice onset detected
+%                 minRms = prctile(rms,10);
+%                 maxRms = prctile(rms(max(1,ceil(voiceOnsetTime/winDur)):end),90);
+%             else
+%                 minRms = 0;
+%                 maxRms = prctile(rms,90);
+%             end
+%             tmpRmsThresh = minRms + (maxRms-minRms)/10;
+%             rmsThresh = .9*rmsThresh + .1*tmpRmsThresh
+%         end
+%     end
+
+%     %% save for each trial
+%     trialData(ii).s = recAudio(1:nSamples);
+%     trialData(ii).fs = expParams.sr;
+%     if SpeechTrial&&voiceOnsetDetected, trialData(ii).reference_time = voiceOnsetTime;
+%     else trialData(ii).reference_time = nonSpeechDelay;
+%     end
+%     trialData(ii).percMissingSamples = (nMissingSamples/(recordLen*expParams.sr))*100;
+% 
+%     %JT save update test 8/10/21
+%     % save only data from current trial
+%     tData = trialData(ii);
+% 
+%     % fName_trial will be used for individual trial files (which will
+%     % live in the run folder)
+%     fName_trial = fullfile(filepath,sprintf('sub-%s_ses-%d_run-%d_task-%s_trial-%d.mat',expParams.subject, expParams.session, expParams.run, expParams.task,ii));
+%     save(fName_trial,'tData');
 end
 release(headwrite);
 release(beepread);
@@ -560,11 +788,41 @@ close all
 expParams.elapsed_time = toc(ET)/60;    % elapsed time of the experiment
 fprintf('\nElapsed Time: %f (min)\n', expParams.elapsed_time)
 
+% % number of trials with voice onset detected
+% onsetCount = nan(expParams.numTrials,1);
+% for j = 1: expParams.numTrials
+%     onsetCount(j) = trialData(j).onsetDetected;
+% end
+% numOnsetDetected = sum(onsetCount);    
 
+% fprintf('Voice onset detected on %d/%d trials\n', numOnsetDetected, expParams.numTrials);
 end
 
 
 function [voiceOnsetDetected, voiceOnsetTime, state]  = detectVoiceOnset(samples, Fs, onDur, onThresh, minVoiceOnsetTime, state)
+% function [voiceOnsetDetected, voiceOnsetTime]  = detectVoiceOnset(samples, Fs, onDur, onThresh, minVoiceOnsetTime)
+% 
+% Function to detect onset of speech production in an audio recording.
+% Input samples can be from a whole recording or from individual frames.
+%
+% INPUTS        samples                 vector of recorded samples
+%               Fs                      sampling frequency of samples
+%               onDur                   how long the intensity must exceed the
+%                                       threshold to be considered an onset (s)
+%               onThresh                onset threshold
+%               minVoiceOnsetTime       time (s) before which voice onset
+%                                       cannot be detected (due to
+%                                       anticipation errors, throat
+%                                       clearing etc) - often set to .09 at
+%                                       beginning of recording/first frame
+%
+% OUTPUTS       voiceOnsetDetected      0 = not detected, 1 = detected
+%               voiceOnsetTime          time (s) when voice onset occurred
+%                                       (with respect of first sample)
+%
+% Adapted from ACE study in Jan 2021 by Elaine Kearney (elaine-kearney.com)
+% Matlab 2019a 
+%
 %%
 
 % set up parameters
@@ -613,6 +871,20 @@ end
 
 
 function out = ManageTime(option, varargin)
+% MANAGETIME time-management functions for real-time operations
+%
+% CLCK = ManageTime('start');             initializes clock to t=0
+% T = ManageTime('current', CLCK);        returns current time T (measured in seconds after t=0)
+% ok = ManageTime('wait', CLCK, T);       waits until time = T (measured in seconds after t=0)
+%                                         returns ok=false if we were already passed T
+%
+% e.g.
+%  CLCK = ManageTime('start');
+%  ok = ManageTime('wait', CLCK, 10);
+%  disp(ManageTime('current', CLCK));
+%  disp(ManageTime('current', CLCK));
+%  disp(ManageTime('current', CLCK));
+%
 
 DEBUG=false;
 switch(lower(option))

@@ -6,7 +6,7 @@
     "task": "jackson20",
     "repetitions_per_unique_qa": 2,
     "shuffle_qa_order": true,
-    "max_unique_qa_repeats": 3,
+    "max_unique_qa_repeats": 2,
     "baseline_trials_proportion" : 0.5,
     "baseline_trials_evenly_spaced" : false, 
     "max_basetrial_repeats" : 2, 

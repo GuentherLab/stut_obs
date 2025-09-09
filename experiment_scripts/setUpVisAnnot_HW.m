@@ -6,6 +6,7 @@ function annoStr = setUpVisAnnot_HW(bg, op)
 
 HW_testing = false;
 
+vardefault('op',struct);
 field_default('op','visible',1); % start visible by default
 field_default('op', 'rectWidthProp', 0.8);      % rectangle width as proportion of screen width
 field_default('op', 'rectHeightProp', 0.6);     % rectangle height as proportion of screen height  
