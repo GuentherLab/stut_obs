@@ -233,19 +233,9 @@ set(annoStr.Stim, 'Visible','on');
 
 audiofile = [dirs.audio_common, filesep, 'q_female_name.mp3'];
 [Input_sound{1}, Input_fs{1}]=audioread(audiofile);
-Input_conditions = {'NRT_CTOPP_Prac_1'};
+Input_conditions = {'unobserved'};
 
 
-% % % % % % % % % % % if expParams.show_question_orthography
-% % % % % % % % % % %     All_figures_str = dir(fullfile(expParams.figurespath, '*.png'));
-% % % % % % % % % % %     All_figures = arrayfun(@(x)fullfile(All_figures_str(x).folder, All_figures_str(x).name), 1:length(All_figures_str), 'uni', 0);
-% % % % % % % % % % %     figures=arrayfun(@(x)fullfile(expParams.figurespath, strcat(x, '.png')), Input_files_temp);
-% % % % % % % % % % %     figureseq=arrayfun(@(x)find(strcmp(All_figures, x)), figures, 'uni', 0);
-% % % % % % % % % % %     if sum(arrayfun(@(x)isempty(figureseq{x}), 1:length(figureseq))) ~= 0
-% % % % % % % % % % %         disp('Some images not found or image names don''t match');
-% % % % % % % % % % %         return
-% % % % % % % % % % %     end
-% % % % % % % % % % % end
 stimreads{1}=dsp.AudioFileReader(audiofile, 'SamplesPerFrame', 2048);
 sileread = dsp.AudioFileReader([expParams.audio_common_path, filesep, 'silent.wav'], 'SamplesPerFrame', 2048);
 

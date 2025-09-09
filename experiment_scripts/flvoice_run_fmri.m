@@ -59,6 +59,7 @@ upcoming_trial_on_commandline = 0;
 %       rmsBeepThresh               : voice onset detection: initial voice-onset root-mean-square threshold [.1]
 %       rmsThreshTimeOnset          : voice onset detection: mininum time (s) for intentisy to be above RMSThresh to be consider voice-onset [0.1] 
 %       rmsThreshTimeOffset         : voice offset detection: mininum time (s) for intentisy to be above and below RMSThresh to be consider voice-onset [0.25 0.25] 
+%       pause_each_trial            : pause at the end of each trial; push button in figure window to continue [do not use in real experiment]
 %       ipatDur                     : prescan sequence: prescan IPAT duration (s) [4.75] 
 %       smsDur                      : prescan sequence: prescan SMS duration (s) [7] 
 %       deviceMic                   : device name for sound input (microphone) (see audiodevinfo().input.Name for details)
@@ -152,6 +153,7 @@ else % if no preset config file defined
         'timeMaxBaseline', [5.5 6.5],... % duration range (s) between 'GO onset' [trial start] and scan start for baseline trials
         'timeNoOnset', 3.0, ...
         'timeScan', 1.6, ...
+        'pause_each_trial', false,...
         'rmsThresh', .02,... %'rmsThresh', .05,...
         'rmsBeepThresh', .1,...
         'rmsThreshTimeOnset', .02,...% 'rmsThreshTimeOnset', .10,...
@@ -208,8 +210,9 @@ fnames=fieldnames(expParams);
 fnames=fnames(~ismember(fnames,{'root','subject', 'session', 'run','play_question_audio_stim',...
     'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats',...
     'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
-    'cover_camera_when_nospeech','show_question_orthography', ...
+    'cover_camera_when_nospeech','show_question_orthography',...
     'timeStim','timePostOnset', 'timePreStim','timeMax','timeMaxBaseline','timeNoOnset', 'timeScan',...
+    'pause_each_trial',...
     'scan', 'deviceMic','deviceHead','deviceScan','task'}));
 for n=1:numel(fnames)
     val=expParams.(fnames{n});
@@ -225,6 +228,7 @@ out_dropbox = {'root','subject', 'session', 'run','play_question_audio_stim',...
     'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
     'cover_camera_when_nospeech','show_question_orthography', ...
     'timeStim','timePostOnset', 'timePreStim','timeMax','timeMaxBaseline','timeNoOnset', 'timeScan',...
+    'pause_each_trial',...
     'scan', 'deviceMic','deviceHead','deviceScan','task'};
 for n=1:numel(out_dropbox)
     val=expParams.(out_dropbox{n});
@@ -374,8 +378,20 @@ YPos = monitorSize(1,4) * 0.3;
 winPos = [XPos YPos fig_width fig_height]; % left,bottom,w,h
 anno_qustnr.hfig.Position = winPos;      anno_op.hfig.visible = 'on'; % move into place and turn visible
 
-
-
+% if expParams.pause_each_trial: create button for continue to next trial
+if expParams.pause_each_trial
+    h_continue_fig = figure('Name','Continue Button', 'MenuBar','none', 'ToolBar','none',...
+                            'Color',[1 0.3 0.3], 'Position',[50, 50, 250, 200]); % left,bottom,w,h
+    continueBtn = uicontrol('Style', 'pushbutton', ...% Create the pause button
+                         'String', 'Continue', ...
+                         'Position', [40, 50, 100, 30], ... % left,bottom,w,h
+                         'Callback', @(src,evt) uiresume(gcbf), ...
+                         'Enable', 'off');
+    continueFigtxt = uicontrol('Style', 'text', ...
+                       'String', 'Waiting for first trial start...', ...
+                       'Position', [5, 150, 300, 50], ... % left,bottom,w,h
+                       'FontSize', 12);
+end
 
 
 %% load stim list and create trial table
@@ -625,7 +641,6 @@ end
 pause(1);
 save(Output_name, 'expParams');
 
-
 %Initialize trialData structure
 trialData = struct;
 
@@ -654,6 +669,18 @@ intvs = [];   %%%%% used for tracking speech trial durations... only important i
 %% LOOP OVER TRIALS
 for itrial = 1:expParams.ntrials
 
+    
+    %% if expParams.pause_each_trial==true, pause and wait for button push
+    if expParams.pause_each_trial
+        set(continueFigtxt, 'String', sprintf('Trial: %d\nClick Continue to proceed', itrial)); % Update display
+        set(continueBtn, 'Enable', 'on', 'String', 'Continue'); % Enable the button and wait for user to click it
+        h_continue_fig.Color = [0.3 1 0.3]; 
+        fprintf('\n\n          Waiting for user to push ''Continue'' button..... \n')
+        uiwait(h_continue_fig); % This pauses execution until user clicks the button
+        set(continueBtn, 'Enable', 'off', 'String', ['Currently running trial ',num2str(itrial)]); % Disable button while processing
+        h_continue_fig.Color = [1 0.3 0.3]; 
+    end
+    
     %% set trial-specific timing parameters for speech vs. baseline trials
     
     % time when the question is asked [either by questioner or by audio file playback]
