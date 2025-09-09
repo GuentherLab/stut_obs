@@ -435,34 +435,39 @@ end
 expParams.n_base_trials = round(expParams.n_speech_trials * expParams.baseline_trials_proportion / [1-expParams.baseline_trials_proportion]); 
 expParams.ntrials = expParams.n_speech_trials + expParams.n_base_trials; 
 trials_speech.basetrial(1:height(trials_speech)) = false; 
-baserow = trials_speech(1,:);
-    baserow.question{1} = '';
-    baserow.answer{1} = '';
-    baserow.stimfile{1} = ''; 
-    baserow.n_syls(1) = NaN;
-    baserow.basetrial = true; 
-if expParams.baseline_trials_evenly_spaced
-    % linearly space baseline trials
-    start_base_trial = max([2 expParams.ntrials/expParams.n_base_trials]); % start base trials later than speech trials; trial 1 is never base
-    baseinds = round(linspace(start_base_trial, expParams.ntrials, expParams.n_base_trials));
-    isbase = false(expParams.ntrials,1); 
-    isbase(baseinds) = true; 
-elseif ~expParams.baseline_trials_evenly_spaced
-    isbase = [false(expParams.n_speech_trials,1); true(expParams.n_base_trials,1)];
-    isbase = isbase(randperm(length(isbase),length(isbase)), :); % shuffle base trial locations
-    base_sequence_lengths = diff(find([0; diff(isbase)])); % sequences of repeated baseline trials 
-    max_repeated_base = max(base_sequence_lengths); 
-
-     % if the first trial is a baseline trial, or if we exceed max baseline trials, then reshuffle
-    while isbase(1)   ||   max_repeated_base > expParams.max_basetrial_repeats
-        isbase = isbase(randperm(length(isbase),length(isbase)), :); % reshuffle
+if expParams.n_base_trials > 0    % skip this section if there are no baseline trials to mix in
+    baserow = trials_speech(1,:);
+        baserow.question{1} = '';
+        baserow.answer{1} = '';
+        baserow.stimfile{1} = ''; 
+        baserow.n_syls(1) = NaN;
+        baserow.basetrial = true; 
+    if expParams.baseline_trials_evenly_spaced
+        % linearly space baseline trials
+        start_base_trial = max([2 expParams.ntrials/expParams.n_base_trials]); % start base trials later than speech trials; trial 1 is never base
+        baseinds = round(linspace(start_base_trial, expParams.ntrials, expParams.n_base_trials));
+        isbase = false(expParams.ntrials,1); 
+        isbase(baseinds) = true; 
+    elseif ~expParams.baseline_trials_evenly_spaced
+        isbase = [false(expParams.n_speech_trials,1); true(expParams.n_base_trials,1)];
+        isbase = isbase(randperm(length(isbase),length(isbase)), :); % shuffle base trial locations
         base_sequence_lengths = diff(find([0; diff(isbase)])); % sequences of repeated baseline trials 
         max_repeated_base = max(base_sequence_lengths); 
+    
+         % if the first trial is a baseline trial, or if we exceed max baseline trials, then reshuffle
+        while isbase(1)   ||   max_repeated_base > expParams.max_basetrial_repeats
+            isbase = isbase(randperm(length(isbase),length(isbase)), :); % reshuffle
+            base_sequence_lengths = diff(find([0; diff(isbase)])); % sequences of repeated baseline trials 
+            max_repeated_base = max(base_sequence_lengths); 
+        end
     end
+    trials = table;
+    trials(isbase,:) = repmat(baserow, expParams.n_base_trials, 1); % fill in baseline trials
+    trials(~isbase,:) = trials_speech; % fill in speech trials
+elseif expParams.n_base_trials == 0
+    trials = trials_speech;
 end
-trials = table; 
-trials(isbase,:) = repmat(baserow, expParams.n_base_trials, 1); % fill in baseline trials
-trials(~isbase,:) = trials_speech; % fill in speech trials
+
 
 
 %% audio device setup
@@ -669,7 +674,6 @@ intvs = [];   %%%%% used for tracking speech trial durations... only important i
 %% LOOP OVER TRIALS
 for itrial = 1:expParams.ntrials
 
-    
     %% if expParams.pause_each_trial==true, pause and wait for button push
     if expParams.pause_each_trial
         set(continueFigtxt, 'String', sprintf('Trial: %d\nClick Continue to proceed', itrial)); % Update display
