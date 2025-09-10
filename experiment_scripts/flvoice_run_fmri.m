@@ -146,7 +146,7 @@ else % if no preset config file defined
         'cover_camera_when_nospeech',true, ... % cover the left side of screen w/ figure where camera is outside of speech epochs
         'show_question_orthography', false, ...
         'timeStim', [3 3.5],...
-        'timePostOnset', 3.5,...
+        'timePostOnset', 4,...
         'timePreStim', 0.5,...
         'timeMax', 6.5, ...
         'timeMaxBaseline', [5.5 6.5],... % duration range (s) between 'GO onset' [trial start] and scan start for baseline trials
@@ -892,18 +892,20 @@ for itrial = 1:expParams.ntrials
     % play beep and switch to visual go cue if it's a speech trial
     if ~trials.basetrial(itrial)
         % GO signal goes with beep
-        while ~isDone(beepread); sound=beepread();headwrite(sound);end;reset(beepread);reset(headwrite);
-        set(anno_stim.Plus, 'Visible','off'); % remove fixcross
-        set(anno_stim.Stim, 'Visible','off'); % remove stim question orthography if it's there (unobserved condition)
+        while ~isDone(beepread); sound=beepread();headwrite(sound);end;reset(beepread);reset(headwrite); % play beep
         set(anno_stim.goArrow, 'Visible', 'on');  % <-- SHOW GREEN ARROW
 
         % show go cue in questioner figure to indicate to look at the camera
-        set(anno_qustnr.Plus, 'Visible','off'); % remove fixcross
-        set(anno_qustnr.Stim, 'Visible','off'); % remove stim question orthography if it's there
         set(anno_qustnr.goRect, 'Visible', 'on');  % <-- show go cue
     end
 
     TIME_GOSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK) % actual time for GO signal 
+
+    % make sure old visual stim is removed; run after getting GO start time
+    set(anno_stim.Plus, 'Visible','off'); % remove fixcross
+    set(anno_stim.Stim, 'Visible','off'); % remove stim question orthography if it's there (unobserved condition)
+    set(anno_qustnr.Plus, 'Visible','off'); % remove fixcross
+    set(anno_qustnr.Stim, 'Visible','off'); % remove stim question orthography if it's there
 
     if ~trials.basetrial(itrial)
        fprintf('\n ------- GREEN GO CUE NOW ONSCREEN, PLAYING BEEP --------\n\n')
@@ -956,11 +958,12 @@ for itrial = 1:expParams.ntrials
             [beepDetected, bTime, beepOnsetState]  = detectVoiceOnset(recAudio(begIdx+numOverrun:endIdx+numOverrun),...
                 expParams.sr, expParams.rmsThreshTimeOnset, rmsBeepThresh, 0, beepOnsetState);
             if beepDetected
-                beepTime = bTime + (begIdx+numOverrun)/expParams.sr; 
+                beepTime = bTime + (begIdx+numOverrun)/expParams.sr 
                 set(micLineB,'value',beepTime,'visible','on');
             end
         elseif ~trials.basetrial(itrial) && voiceOnsetDetected == 0,% && frameCount > onsetWindow/frameDur
-            if ~beepDetected; beepTime = 0; 
+            % if ~beepDetected; beepTime = 0; 
+            if ~beepDetected; beepTime = .5; 
                %%%%%%%% timing warnings
                 if show_timing_warnings
                     disp('Beep not detected. Assign beepTime = 0.'); 
@@ -1044,7 +1047,8 @@ for itrial = 1:expParams.ntrials
     % ... if needed consider placing this below some or all the plot/save operations below (at this point the code will typically wait for at least ~2s,...
     % ... between the end of the recording to the beginning of the scan)
     if expParams.scan 
-        ok = ManageTime('wait', CLOCK, TIME_SCAN_START + RT);
+        % % % % % % % ok = ManageTime('wait', CLOCK, TIME_SCAN_START + RT); %%% AM commented out.... adding +RT makes scan come later
+        ok = ManageTime('wait', CLOCK, TIME_SCAN_START);     %% AM version of scan timing line without +RT
         %playblocking(triggerPlayer);
         while ~isDone(trigread); 
             sound=trigread();
@@ -1053,8 +1057,9 @@ for itrial = 1:expParams.ntrials
         reset(trigwrite);
 
         TIME_SCAN_ACTUALLYSTART=ManageTime('current', CLOCK);
-            fprintf(['\n#################################################\n  ###     SENT SCAN TRIGGER   ........ trial ', ...
-                num2str(itrial), '/' num2str(expParams.ntrials), ' ### \n#####################################################'])
+            fprintf(['\n#################################################\n  ###     SENT SCAN TRIGGER at ',num2str(TIME_SCAN_ACTUALLYSTART),...
+            '........ trial ',  num2str(itrial), '/' num2str(expParams.ntrials), ' ### \n#####################################################'])
+            fprintf(['\n TIME_VOICE_START = ',num2str(TIME_VOICE_START),'\n'])
         TIME_SCAN_END = TIME_SCAN_ACTUALLYSTART + trialData(itrial).timeScan;
         NEXTTRIAL = TIME_SCAN_END + trialData(itrial).timePreStim;
         
@@ -1064,7 +1069,6 @@ for itrial = 1:expParams.ntrials
         end
 
 
-
 % %% this section changes baseline trial durations throughout the run depending on speech trial durations
 % %%%%%% AM commented out for stut-obs
 %         if ~trials.basetrial(itrial); 
@@ -1072,8 +1076,6 @@ for itrial = 1:expParams.ntrials
 %             expParams.timeNULL = mean(intvs);
 %         end
 % %% 
-
-
 
 
         if isnan(trialData(itrial).voiceOnsetTime)
