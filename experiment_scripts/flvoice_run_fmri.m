@@ -748,7 +748,7 @@ for itrial = 1:expParams.ntrials
     end
 
     if trials.basetrial(itrial)
-        experimenter_cue_string = '(BASELINE TRIAL - NO QUESTION)'; 
+        experimenter_cue_string = '(BASELINE TRIAL\n - \nNO QUESTION)'; 
        if expParams.cover_camera_when_nospeech
             cam_blocker_state = 'on'; % block camera if it's a basetrial and if the blocker is enabled
        elseif ~expParams.cover_camera_when_nospeech
