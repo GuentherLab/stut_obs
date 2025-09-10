@@ -132,7 +132,6 @@ if preFlag
     expParams = expRead;
 else % if no preset config file defined
     expParams=struct(...
-        'root', 'C:\ieeg_stut', ...
         'subject','example',...
         'session', 1, ...
         'run', 1,...
@@ -162,9 +161,9 @@ else % if no preset config file defined
         'minVoiceOnsetTime', 0.4, ...
         'ipatDur', 5.00,...         %   prescan IPAT duration
         'smsDur', 7,...             %   prescan SMS duration
-        'deviceMic','Analogue 1 + 2 (2- Focusrite USB Audio)',... % subject microphone
-        'deviceHead','Speakers (2- Focusrite USB Audio)', ... % audio output to subject (headphones or speaker)
-        'deviceScan','Playback 3 + 4 (2- Focusrite USB Audio)', ... % audio channel to send triggers to scanner
+        'deviceMic','Analogue 1 + 2 (Focusrite USB Audio)',... % subject microphone
+        'deviceHead','Speakers (Focusrite USB Audio)', ... % audio output to subject (headphones or speaker)
+        'deviceScan','Playback 3 + 4 (Focusrite USB Audio)', ... % audio channel to send triggers to scanner
         'rectWidthProp', 0.8, ...      % rectangle width as proportion of screen width
         'rectHeightProp', 0.6, ...     % rectangle height as proportion of screen height  
         'rectColor', [0 1 0], ...      % RGB color of rectangle [R G B] (0-1 scale)
@@ -207,7 +206,7 @@ tgind = find(contains(strOUTPUT, 'Playback')&contains(strOUTPUT, 'Focusrite'));
 
 %% use GUI that allows user to modify options
 fnames=fieldnames(expParams);
-fnames=fnames(~ismember(fnames,{'root','subject', 'session', 'run','play_question_audio_stim',...
+fnames=fnames(~ismember(fnames,{'subject', 'session', 'run','play_question_audio_stim',...
     'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats',...
     'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
     'cover_camera_when_nospeech','show_question_orthography',...
@@ -223,7 +222,7 @@ for n=1:numel(fnames)
 end
 
 
-out_dropbox = {'root','subject', 'session', 'run','play_question_audio_stim',...
+out_dropbox = {'subject', 'session', 'run','play_question_audio_stim',...
     'repetitions_per_unique_qa','shuffle_qa_order','max_unique_qa_repeats',...
     'baseline_trials_proportion','baseline_trials_evenly_spaced','max_basetrial_repeats',...
     'cover_camera_when_nospeech','show_question_orthography', ...
@@ -240,6 +239,10 @@ end
 
 default_width = 0.02;
 default_intvl = 0.03; 
+
+% do not have a default root dir; instead let set_paths_stut_obs.m
+%   set it based on the host name
+expParams.root = dirs.data; 
 
 thfig=dialog('units','norm','position',[.2,.1,.6,.9],'windowstyle','normal','name','Experiment options','color','w','resize','on');
 uicontrol(thfig,'style','text','units','norm','position',[.1,.92,.8,default_width],...
@@ -471,6 +474,11 @@ end
 
 
 %% audio device setup
+% sometimes focusrite devices get slightly modified names, like 
+% 'Analogue 1 + 2 (2- Focusrite USB Audio)'     instead of 'Analogue 1 + 2 (Focusrite USB Audio)'
+% ....
+% in this case, modify the name of these devices in windows sound settings
+% to match the expected Focusrite device names rather than trying to match those devices in config file
 sileread = dsp.AudioFileReader(fullfile(expParams.audio_common_path, 'silent.wav'), 'SamplesPerFrame', 2048);
 
 % set audio device variables: deviceReader: mic input; beepPlayer: beep output; triggerPlayer: trigger output
