@@ -136,6 +136,7 @@ else % if no preset config file defined
         'session', 1, ...
         'run', 1,...
         'scan', true, ...
+        'prescan', true, ...
         'play_question_audio_stim',false,... % play (unobserved condition) or don't play (observed condition) the audio quesiton stim
         'repetitions_per_unique_qa', 3, ...
         'shuffle_qa_order', true, ... % specifically affects stim order, not baseline trials
@@ -157,7 +158,6 @@ else % if no preset config file defined
         'rmsBeepThresh', .1,...
         'rmsThreshTimeOnset', .02,...% 'rmsThreshTimeOnset', .10,...
         'rmsThreshTimeOffset', [.25 .25],...
-        'prescan', 0, ...
         'minVoiceOnsetTime', 0.4, ...
         'ipatDur', 5.00,...         %   prescan IPAT duration
         'smsDur', 7,...             %   prescan SMS duration
@@ -212,7 +212,7 @@ fnames=fnames(~ismember(fnames,{'subject', 'session', 'run','play_question_audio
     'cover_camera_when_nospeech','show_question_orthography',...
     'timeStim','timePostOnset', 'timePreStim','timeMax','timeMaxBaseline','timeNoOnset', 'timeScan',...
     'pause_each_trial',...
-    'scan', 'deviceMic','deviceHead','deviceScan','task'}));
+    'scan', 'prescan', 'deviceMic','deviceHead','deviceScan','task'}));
 for n=1:numel(fnames)
     val=expParams.(fnames{n});
     if ischar(val), fvals{n}=val;
@@ -228,7 +228,7 @@ out_dropbox = {'subject', 'session', 'run','play_question_audio_stim',...
     'cover_camera_when_nospeech','show_question_orthography', ...
     'timeStim','timePostOnset', 'timePreStim','timeMax','timeMaxBaseline','timeNoOnset', 'timeScan',...
     'pause_each_trial',...
-    'scan', 'deviceMic','deviceHead','deviceScan','task'};
+    'scan', 'prescan','deviceMic','deviceHead','deviceScan','task'};
 for n=1:numel(out_dropbox)
     val=expParams.(out_dropbox{n});
     if ischar(val), fvals_o{n}=val;
@@ -679,10 +679,14 @@ set(anno_stim.Stim, 'Visible','off');     % Turn off preparation page
 CLOCK=[];                               % Main clock (not yet started)
 intvs = [];   %%%%% used for tracking speech trial durations... only important if we're changing baseline trial durations throughout the run
 
+% initialize the timepoint struct; 
+%%% do not rewrite at beginning of trial, ...
+%%% ...because we might overwrite timepoints that carry over partially
+%%% ...between trials, like NEXTRTRIAL
+timepoints = struct; 
+
 %% LOOP OVER TRIALS
 for itrial = 1:expParams.ntrials
-
-    tt = struct; % initialize the timepoint struct
 
     %% if expParams.pause_each_trial==true, pause and wait for button push
     if expParams.pause_each_trial
@@ -798,16 +802,16 @@ for itrial = 1:expParams.ntrials
 
     if isempty(CLOCK)
         CLOCK = ManageTime('start');    % resets clock to t=0 (first-trial start-time)
-        tt.TIME_TRIAL_START = 0;
+        timepoints.TIME_TRIAL_START = 0;
         TIME_STIM_START = 0;
     else
-        tt.TIME_TRIAL_START = ManageTime('current', CLOCK);
+        timepoints.TIME_TRIAL_START = ManageTime('current', CLOCK);
     end
 
     ok=ManageTime('wait', CLOCK, TIME_STIM_START);
 
     % start of the trial
-    tt.TIME_TEXT_ACTUALLYSTART = ManageTime('current', CLOCK)
+    timepoints.TIME_TEXT_ACTUALLYSTART = ManageTime('current', CLOCK)
     
     %%%%% display question for this trial on commandline
     fprintf(['\n', experimenter_cue_string, ' ........ trial ', num2str(itrial), '/' num2str(expParams.ntrials), ...
@@ -853,18 +857,18 @@ for itrial = 1:expParams.ntrials
         stimPlayer.StopFcn = @(obj, event) store_audioplayer_time(stimPlayer,CLOCK)
         stimPlayer.UserData.completion_time = nan; % clear and initialize this field
         play(stimPlayer);
-        TIME_SOUND_ACTUALLYSTART = ManageTime('current', CLOCK);
+        timepoints.TIME_SOUND_ACTUALLYSTART = ManageTime('current', CLOCK);
     end
 
     % stimulus ends.... called TIME_TEXT_END in other versions of FLVoice_run like SEQM
     %%%% 
-    tt.TIME_QUESTION_END = tt.TIME_TEXT_ACTUALLYSTART + trialData(itrial).timeStim;  
+    timepoints.TIME_QUESTION_END = timepoints.TIME_TEXT_ACTUALLYSTART + trialData(itrial).timeStim;  
 
     %% after stimulus
-    tt.TIME_GOSIGNAL_START = tt.TIME_QUESTION_END;          % GO signal time
+    timepoints.TIME_GOSIGNAL_START = timepoints.TIME_QUESTION_END;          % GO signal time
     set(micLine,'visible','off');set(micLineB,'visible','off');drawnow;
         
-    ok=ManageTime('wait', CLOCK, tt.TIME_GOSIGNAL_START - beepoffset);     % waits for recorder initialization time
+    ok=ManageTime('wait', CLOCK, timepoints.TIME_GOSIGNAL_START - beepoffset);     % waits for recorder initialization time
 
     % note: this line may take some random initialization time to run; ....
     %  ...... audio signal start (t=0) will be synchronized to the time when this line finishes running
@@ -874,7 +878,7 @@ for itrial = 1:expParams.ntrials
     if show_timing_warnings
         if ~ok, fprintf('i am late for this trial tt.TIME_GOSIGNAL_START - beepoffset\n'); end
     end
-    ok=ManageTime('wait', CLOCK, tt.TIME_GOSIGNAL_START);     % waits for GO signal time
+    ok=ManageTime('wait', CLOCK, timepoints.TIME_GOSIGNAL_START);     % waits for GO signal time
 
     % audio stim [if played on this trial] should be done, so get sound end time and clear the object
     if expParams.play_question_audio_stim && ~trials.basetrial(itrial)
@@ -884,9 +888,9 @@ for itrial = 1:expParams.ntrials
         while isnan( stimPlayer.UserData.completion_time ) 
             pause(wait_period)
         end
-        TIME_SOUND_ACTUALLYEND = stimPlayer.UserData.completion_time;   % clear stimPlayer
+        timepoints.TIME_SOUND_ACTUALLYEND = stimPlayer.UserData.completion_time;   % clear stimPlayer
     else
-        TIME_SOUND_ACTUALLYEND = nan; 
+        timepoints.TIME_SOUND_ACTUALLYEND = nan; 
     end
 
     % play beep and switch to visual go cue if it's a speech trial
@@ -899,7 +903,7 @@ for itrial = 1:expParams.ntrials
         set(anno_qustnr.goRect, 'Visible', 'on');  % <-- show go cue
     end
 
-    tt.TIME_GOSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK) % actual time for GO signal 
+    timepoints.TIME_GOSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK) % actual time for GO signal 
 
     % make sure old visual stim is removed; run after getting GO start time
     set(anno_stim.Plus, 'Visible','off'); % remove fixcross
@@ -926,9 +930,9 @@ for itrial = 1:expParams.ntrials
     %       .... which is updated each trial depending on timing of recent speech trials
     
     % reaction time
-    tt.TIME_VOICE_START = tt.TIME_GOSIGNAL_ACTUALLYSTART + nonSpeechDelay;       % expected voice onset time
+    timepoints.TIME_VOICE_START = timepoints.TIME_GOSIGNAL_ACTUALLYSTART + nonSpeechDelay;       % expected voice onset time
 
-    tt.TIME_SCAN_START = tt.TIME_GOSIGNAL_ACTUALLYSTART ...
+    timepoints.TIME_SCAN_START = timepoints.TIME_GOSIGNAL_ACTUALLYSTART ...
         + ~trials.basetrial(itrial) * trialData(itrial).timeMax... % if speech trial, wait timeMax after go cue to scan
         + trials.basetrial(itrial) * expParams.timeNULL; % if baseline trial, wait timeNULL after "go cue" (not actually presented) to scan
 
@@ -982,19 +986,19 @@ for itrial = 1:expParams.ntrials
 
             if voiceOnsetDetected
                 voiceOnsetTime = voiceOnsetTime + (begIdx+numOverrun)/expParams.sr - beepTime;
-                tt.TIME_VOICE_START = tt.TIME_GOSIGNAL_ACTUALLYSTART + voiceOnsetTime; % note: voiceonsetTime marks the beginning of the minThreshTime window
+                timepoints.TIME_VOICE_START = timepoints.TIME_GOSIGNAL_ACTUALLYSTART + voiceOnsetTime; % note: voiceonsetTime marks the beginning of the minThreshTime window
                 nonSpeechDelay = .5*nonSpeechDelay + .5*voiceOnsetTime;  % running-average of voiceOnsetTime values, with alpha-parameter = 0.5 (nonSpeechDelay = alpha*nonSpeechDelay + (1-alph)*voiceOnsetTime; alpha between 0 and 1; alpha high -> slow update; alpha low -> fast update)
-                tt.TIME_SCAN_START =  tt.TIME_VOICE_START + trialData(itrial).timePostOnset;
-                nSamples = min(nSamples, ceil((tt.TIME_SCAN_START-tt.TIME_GOSIGNAL_ACTUALLYSTART-prepareScan)*expParams.sr)); % ends recording 250ms before scan time (or timeMax if that is earlier)
+                timepoints.TIME_SCAN_START =  timepoints.TIME_VOICE_START + trialData(itrial).timePostOnset;
+                nSamples = min(nSamples, ceil((timepoints.TIME_SCAN_START-timepoints.TIME_GOSIGNAL_ACTUALLYSTART-prepareScan)*expParams.sr)); % ends recording 250ms before scan time (or timeMax if that is earlier)
                 endSamples = nSamples;
                 % add voice onset to plot
                 set(micLine,'value',voiceOnsetTime + beepTime,'visible','on');
                 drawnow update
             else
                 CURRENT_TIME = ManageTime('current', CLOCK);
-                if CURRENT_TIME - tt.TIME_GOSIGNAL_ACTUALLYSTART - prepareScan > trialData(itrial).timeNoOnset + nonSpeechDelay
+                if CURRENT_TIME - timepoints.TIME_GOSIGNAL_ACTUALLYSTART - prepareScan > trialData(itrial).timeNoOnset + nonSpeechDelay
                     endSamples = endIdx;
-                    tt.TIME_SCAN_START = CURRENT_TIME;
+                    timepoints.TIME_SCAN_START = CURRENT_TIME;
                 end
             end
         end
@@ -1020,8 +1024,8 @@ for itrial = 1:expParams.ntrials
     if ~trials.basetrial(itrial)
 
         % wait until slightly before scan to turn GO cross red
-        ok = ManageTime('wait', CLOCK, tt.TIME_SCAN_START - prepareScan);
-        TIME_STOPSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK);
+        ok = ManageTime('wait', CLOCK, timepoints.TIME_SCAN_START - prepareScan);
+        timepoints.TIME_STOPSIGNAL_ACTUALLYSTART = ManageTime('current', CLOCK);
 
         set(anno_stim.goArrow, 'Visible', 'off');  % <-- HIDE GREEN ARROW
         set(anno_stim.Plus, 'color','r');  
@@ -1051,7 +1055,7 @@ for itrial = 1:expParams.ntrials
     % ... between the end of the recording to the beginning of the scan)
     if expParams.scan 
         % % % % % % % ok = ManageTime('wait', CLOCK, tt.TIME_SCAN_START + RT); %%% AM commented out.... adding +RT makes scan come later
-        ok = ManageTime('wait', CLOCK, tt.TIME_SCAN_START);     %% AM version of scan timing line without +RT
+        ok = ManageTime('wait', CLOCK, timepoints.TIME_SCAN_START);     %% AM version of scan timing line without +RT
         %playblocking(triggerPlayer);
         while ~isDone(trigread); 
             sound=trigread();
@@ -1059,12 +1063,12 @@ for itrial = 1:expParams.ntrials
         end;reset(trigread);
         reset(trigwrite);
 
-        tt.TIME_SCAN_ACTUALLYSTART=ManageTime('current', CLOCK);
-            fprintf(['\n#################################################\n  ###     SENT SCAN TRIGGER at ',num2str(tt.TIME_SCAN_ACTUALLYSTART),...
+        timepoints.TIME_SCAN_ACTUALLYSTART=ManageTime('current', CLOCK);
+            fprintf(['\n#################################################\n  ###     SENT SCAN TRIGGER at ',num2str(timepoints.TIME_SCAN_ACTUALLYSTART),...
             '........ trial ',  num2str(itrial), '/' num2str(expParams.ntrials), ' ### \n#####################################################'])
-            fprintf(['\n tt.TIME_VOICE_START = ',num2str(tt.TIME_VOICE_START),'\n'])
-        tt.TIME_SCAN_END = tt.TIME_SCAN_ACTUALLYSTART + trialData(itrial).timeScan;
-        NEXTTRIAL = tt.TIME_SCAN_END + trialData(itrial).timePreStim;
+            fprintf(['\n tt.TIME_VOICE_START = ',num2str(timepoints.TIME_VOICE_START),'\n'])
+        timepoints.TIME_SCAN_END = timepoints.TIME_SCAN_ACTUALLYSTART + trialData(itrial).timeScan;
+        timepoints.NEXTTRIAL = timepoints.TIME_SCAN_END + trialData(itrial).timePreStim;
         
         %%%%%%%% timing warnings
         if show_timing_warnings
@@ -1088,23 +1092,23 @@ for itrial = 1:expParams.ntrials
         end
         %%%%%%%% timing warnings
         if show_timing_warnings
-            fprintf('\nThis trial elapsed Time: %.3f (s), expected duration: %.3f (s)\n', NEXTTRIAL - TIME_STIM_START, expdur);
+            fprintf('\nThis trial elapsed Time: %.3f (s), expected duration: %.3f (s)\n', timepoints.NEXTTRIAL - TIME_STIM_START, expdur);
         end
     else
-        tt.TIME_SCAN_ACTUALLYSTART=nan;
+        timepoints.TIME_SCAN_ACTUALLYSTART=nan;
         %TIME_TRIG_RELEASED = nan;
-        tt.TIME_SCAN_END = nan;
-        NEXTTRIAL = tt.TIME_SCAN_START + trialData(itrial).timePreStim;
+        timepoints.TIME_SCAN_END = nan;
+        timepoints.NEXTTRIAL = timepoints.TIME_SCAN_START + trialData(itrial).timePreStim;
     end
 
     % copy timepoint data to trialData; updated version by AM 2025/9/11
     expParams.timingTrialNames = '';
     trialData(itrial).timingTrial = [];
-    fieldNames = fieldnames(tt);
+    fieldNames = fieldnames(timepoints);
     for ifield = 1:numel(fieldNames) % Loop through each field name
         currentFieldName = fieldNames{ifield}; % Get the current field name from the list
         expParams.timingTrialNames = [expParams.timingTrialNames, currentFieldName, ';']; % append name
-        currentFieldValue = tt.(currentFieldName); % get the value of the current field
+        currentFieldValue = timepoints.(currentFieldName); % get the value of the current field
         trialData(itrial).timingTrial = [trialData(itrial).timingTrial; currentFieldValue]; % append value
     end
     expParams.timingTrialNames
@@ -1118,7 +1122,7 @@ for itrial = 1:expParams.ntrials
     % % % %     split(['tt.TIME_TRIAL_START;tt.TIME_TEXT_ACTUALLYSTART;TIME_TEXT_END;tt.TIME_GOSIGNAL_START;tt.TIME_GOSIGNAL_ACTUALLYSTART;',...
     % % % %     'tt.TIME_VOICE_START;tt.TIME_SCAN_START:tt.TIME_SCAN_ACTUALLYSTART;tt.TIME_SCAN_END;']);
     
-    TIME_STIM_START = NEXTTRIAL;
+    TIME_STIM_START = timepoints.NEXTTRIAL;
 
     %% save data for each trial
     trialData(itrial).s = recAudio(1:nSamples);
@@ -1137,6 +1141,7 @@ for itrial = 1:expParams.ntrials
     fName_trial = fullfile(dirs.task,sprintf('sub-%s_ses-%d_run-%s_task-%s_trial-%d.mat',...
         expParams.subject, expParams.session, expParams.runstring, expParams.task,itrial));
     save(fName_trial,'tData');
+    save([dirs.ses, filesep, 'expParams'],'expParams')
 end
 
 release(headwrite);
