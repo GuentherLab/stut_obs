@@ -1,4 +1,4 @@
-function testMicHeadphones(varargin)
+function testMicHeadphones_standalone(varargin)
 close all;
 % varargin:
 % "type" : '20s' or 'regular'

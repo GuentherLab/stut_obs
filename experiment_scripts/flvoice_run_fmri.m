@@ -137,7 +137,7 @@ else % if no preset config file defined
         'run', 1,...
         'scan', true, ...
         'play_question_audio_stim',false,... % play (unobserved condition) or don't play (observed condition) the audio quesiton stim
-        'repetitions_per_unique_qa', 2, ...
+        'repetitions_per_unique_qa', 3, ...
         'shuffle_qa_order', true, ... % specifically affects stim order, not baseline trials
         'max_unique_qa_repeats',2, ... % max consecutive repeats of a given QA stim, before baseline trials are mixed in
         'baseline_trials_proportion',0.5,... % proportion of all trials that are baseline trials
@@ -145,7 +145,7 @@ else % if no preset config file defined
         'max_basetrial_repeats',2,... % don't let there be more than this many no-speech trials in row
         'cover_camera_when_nospeech',true, ... % cover the left side of screen w/ figure where camera is outside of speech epochs
         'show_question_orthography', false, ...
-        'timeStim', [3 3.5],...
+        'timeStim', [3.75 3.75],...
         'timePostOnset', 4,...
         'timePreStim', 0.5,...
         'timeMax', 6.5, ...
@@ -157,7 +157,7 @@ else % if no preset config file defined
         'rmsBeepThresh', .1,...
         'rmsThreshTimeOnset', .02,...% 'rmsThreshTimeOnset', .10,...
         'rmsThreshTimeOffset', [.25 .25],...
-        'prescan', true, ...
+        'prescan', 0, ...
         'minVoiceOnsetTime', 0.4, ...
         'ipatDur', 5.00,...         %   prescan IPAT duration
         'smsDur', 7,...             %   prescan SMS duration
@@ -748,7 +748,7 @@ for itrial = 1:expParams.ntrials
     end
 
     if trials.basetrial(itrial)
-        experimenter_cue_string = '(BASELINE TRIAL\n - \nNO QUESTION)'; 
+        experimenter_cue_string = '(BASELINE TRIAL - NO QUESTION)'; 
        if expParams.cover_camera_when_nospeech
             cam_blocker_state = 'on'; % block camera if it's a basetrial and if the blocker is enabled
        elseif ~expParams.cover_camera_when_nospeech
@@ -864,8 +864,6 @@ for itrial = 1:expParams.ntrials
         
     ok=ManageTime('wait', CLOCK, TIME_GOSIGNAL_START - beepoffset);     % waits for recorder initialization time
 
-
-
     % note: this line may take some random initialization time to run; ....
     %  ...... audio signal start (t=0) will be synchronized to the time when this line finishes running
     [nill, nill] = deviceReader(); 
@@ -905,10 +903,13 @@ for itrial = 1:expParams.ntrials
     set(anno_stim.Plus, 'Visible','off'); % remove fixcross
     set(anno_stim.Stim, 'Visible','off'); % remove stim question orthography if it's there (unobserved condition)
     set(anno_qustnr.Plus, 'Visible','off'); % remove fixcross
-    set(anno_qustnr.Stim, 'Visible','off'); % remove stim question orthography if it's there
+    
 
     if ~trials.basetrial(itrial)
        fprintf('\n ------- GREEN GO CUE NOW ONSCREEN, PLAYING BEEP --------\n\n')
+       % in spech trial, remove stim question orthography if it's there; in
+       % basetrial this will just be notification that it's a basetrial
+       set(anno_qustnr.Stim, 'Visible','off'); 
     end
 
     %%%%%%%% timing warnings  
