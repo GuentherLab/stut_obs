@@ -1120,14 +1120,6 @@ for itrial = 1:expParams.ntrials
     expParams.timingTrialNames
     trialData(itrial).timingTrial
 
-    % old version of copying timepoint data to trialData
-    % % % % trialData(itrial).timingTrial = ...
-    % % % %     [tt.TIME_TRIAL_START;tt.TIME_TEXT_ACTUALLYSTART;tt.TIME_QUESTION_END;tt.TIME_GOSIGNAL_START;tt.TIME_GOSIGNAL_ACTUALLYSTART;...
-    % % % %     tt.TIME_VOICE_START;tt.TIME_SCAN_START;tt.TIME_SCAN_ACTUALLYSTART;tt.TIME_SCAN_END];
-    % % % % expParams.timingTrialNames = ...
-    % % % %     split(['tt.TIME_TRIAL_START;tt.TIME_TEXT_ACTUALLYSTART;TIME_TEXT_END;tt.TIME_GOSIGNAL_START;tt.TIME_GOSIGNAL_ACTUALLYSTART;',...
-    % % % %     'tt.TIME_VOICE_START;tt.TIME_SCAN_START:tt.TIME_SCAN_ACTUALLYSTART;tt.TIME_SCAN_END;']);
-    
     TIME_STIM_START = timepoints.NEXTTRIAL;
 
     %% save data for each trial
@@ -1159,7 +1151,8 @@ end
 
 
 %% end of experiment
-close all
+hfig_cam_blocker.Visible = 'on'; % keep camera blocker on at end of run
+close(setdiff(findall(0, 'Type', 'figure'), hfig_cam_blocker)); % close all except cam blocker
 
 % experiment time
 expParams.elapsed_time = toc(ET)/60;    % elapsed time of the experiment
