@@ -406,6 +406,8 @@ dirs.run = [dirs.ses, filesep, 'run-',expParams.runstring]; % put trial data fil
     mkdir(dirs.run) % make folder for this run - probably does not exist yet
 dirs.stim_audio = [dirs.ses, filesep, 'stim_audio']; 
 dirs.task = [dirs.ses, filesep, 'beh', filesep, expParams.task]; 
+dirs.trial_table_filename = [dirs.task, filesep, 'sub-%s_ses-%d_run-%s_task-%s_trials.tsv']; 
+expParams.dirs = dirs; 
 unique_answers_file  = fullfile(dirs.task,sprintf('sub-%s_ses-%d_run-%s_task-%s_qa-list.tsv',expParams.subject, expParams.session, expParams.runstring, expParams.task));
 Output_name = fullfile(dirs.task,sprintf('sub-%s_ses-%d_run-%s_task-%s_desc-presentation.mat',expParams.subject, expParams.session, expParams.runstring, expParams.task));
 if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite',...
@@ -586,10 +588,8 @@ micTitle = title('', 'Fontsize', default_fontsize-1, 'interpreter','none');
 xlabel('Time(s)');
 ylabel('Sound Pressure');
 
-
 pause(1);
 save(Output_name, 'expParams');
-
 
 %% pre scans
 if expParams.scan && expParams.prescan && ~CMRR
@@ -1083,16 +1083,6 @@ for itrial = 1:expParams.ntrials
             if ~ok, fprintf('i am late for this trial tt.TIME_SCAN_START\n'); end
         end
 
-
-% %% this section changes baseline trial durations throughout the run depending on speech trial durations
-% %%%%%% AM commented out for stut-obs
-%         if ~trials.basetrial(itrial); 
-%             intvs = [intvs tt.TIME_SCAN_START - tt.TIME_GOSIGNAL_START]; 
-%             expParams.timeNULL = mean(intvs);
-%         end
-% %% 
-
-
         if isnan(trialData(itrial).voiceOnsetTime)
             expdur = trialData(itrial).timePreStim + trialData(itrial).timeStim + trialData(itrial).timeNoOnset + trialData(itrial).timeScan + 0.5 + nonSpeechDelay; % add the other average wait time if no onset
         else
@@ -1118,6 +1108,12 @@ for itrial = 1:expParams.ntrials
         expParams.timingTrialNames = [expParams.timingTrialNames, currentFieldName, ';']; % append name
         currentFieldValue = timepoints.(currentFieldName); % get the value of the current field
         trialData(itrial).timingTrial = [trialData(itrial).timingTrial; currentFieldValue]; % append value
+
+        % add to trial table; save to .tsv.... suppress warnings
+        orig_state = warning('query', 'MATLAB:table:RowsAddedExistingVars');
+        warning('off', 'MATLAB:table:RowsAddedExistingVars');
+        trials{itrial,currentFieldName} = timepoints.(currentFieldName); % get the value of the current field
+        warning(orig_state.state, 'MATLAB:table:RowsAddedExistingVars');
     end
     expParams.timingTrialNames
     trialData(itrial).timingTrial
@@ -1143,7 +1139,12 @@ for itrial = 1:expParams.ntrials
     fName_trial = fullfile(dirs.run,sprintf('sub-%s_ses-%d_run-%s_task-%s_trial-%d.mat',...
         expParams.subject, expParams.session, expParams.runstring, expParams.task,itrial));
     save(fName_trial,'tData');
-    save([dirs.run, filesep, 'expParams'],'expParams')
+    writetable(trials, dirs.trial_table_filename, 'FileType','text','Delimiter','tab') % update trial table with timing data each trial
+
+    % if it's the first trial, update expParams.timingTrialNames now that all timepoint names are established
+    if itrial == 1 
+        save(Output_name, 'expParams');
+    end
 end
 
 release(headwrite);
