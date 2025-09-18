@@ -171,8 +171,10 @@ else % if no preset config file defined
         );
 end
 
+% hardcoded parameters - probably don't need to change from run to run
 expParams.computer = host;
 expParams.audio_common_path = dirs.audio_common; % for audio stim shared across subjects
+expParams.beep_volume_multiplier = 1; % scale beep loudness by this multiplier
 expParams.recordingToScanBuffer = 0.25; % end the audio recording of subject mic this early (sec) to give buffer before scan trigger
 
 %%%% if varargin was param-value pairs, interpret as expParams values
@@ -669,7 +671,7 @@ set(anno_stim.Stim, 'Visible','on');
 
 while ~isDone(sileread); 
     sound=sileread();
-    headwrite(sound);
+    headwrite(sound * expParams.beep_volume_multiplier); % scale beep volume when playing
 end
 release(sileread);
 reset(headwrite);
@@ -896,7 +898,11 @@ for itrial = 1:expParams.ntrials
     % play beep and switch to visual go cue if it's a speech trial
     if ~trials.basetrial(itrial)
         % GO signal goes with beep
-        while ~isDone(beepread); sound=beepread();headwrite(sound);end;reset(beepread);reset(headwrite); % play beep
+        while ~isDone(beepread); 
+            sound=beepread();
+            headwrite(sound * expParams.beep_volume_multiplier); % scale beep volume when playing
+        end
+        reset(beepread); reset(headwrite); % play beep
         set(anno_stim.goArrow, 'Visible', 'on');  % <-- SHOW GREEN ARROW
 
         % show go cue in questioner figure to indicate to look at the camera
