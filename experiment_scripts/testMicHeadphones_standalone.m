@@ -410,7 +410,7 @@ while 1
     else
         TIME_TRIAL_START = ManageTime('current', CLOCK);
     end
-    
+        
     ok=ManageTime('wait', CLOCK, TIME_STIM_START);
     TIME_STIM_ACTUALLYSTART = ManageTime('current', CLOCK);
     if expParams.show_question_orthography
