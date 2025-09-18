@@ -402,6 +402,8 @@ end
 %% load stim list and create trial table
 % root path is where the subject description files are
 dirs.ses = [expParams.root, filesep, sprintf('sub-%s',expParams.subject), filesep, sprintf('ses-%d',expParams.session)];
+dirs.run = [dirs.ses, filesep, 'run-',expParams.runstring]; % put trial data files here
+    mkdir(dirs.run) % make folder for this run - probably does not exist yet
 dirs.stim_audio = [dirs.ses, filesep, 'stim_audio']; 
 dirs.task = [dirs.ses, filesep, 'beh', filesep, expParams.task]; 
 unique_answers_file  = fullfile(dirs.task,sprintf('sub-%s_ses-%d_run-%s_task-%s_qa-list.tsv',expParams.subject, expParams.session, expParams.runstring, expParams.task));
@@ -1125,8 +1127,10 @@ for itrial = 1:expParams.ntrials
     %% save data for each trial
     trialData(itrial).s = recAudio(1:nSamples);
     trialData(itrial).fs = expParams.sr;
-    if trials.basetrial(itrial) && voiceOnsetDetected, trialData(itrial).reference_time = voiceOnsetTime;
-    else trialData(itrial).reference_time = nonSpeechDelay;
+    if trials.basetrial(itrial) && voiceOnsetDetected
+        trialData(itrial).reference_time = voiceOnsetTime;
+    else 
+        trialData(itrial).reference_time = nonSpeechDelay;
     end
     trialData(itrial).percMissingSamples = (nMissingSamples/(recordLen*expParams.sr))*100;
 
@@ -1136,10 +1140,10 @@ for itrial = 1:expParams.ntrials
 
     % fName_trial will be used for individual trial files (which will
     % live in the run folder)
-    fName_trial = fullfile(dirs.task,sprintf('sub-%s_ses-%d_run-%s_task-%s_trial-%d.mat',...
+    fName_trial = fullfile(dirs.run,sprintf('sub-%s_ses-%d_run-%s_task-%s_trial-%d.mat',...
         expParams.subject, expParams.session, expParams.runstring, expParams.task,itrial));
     save(fName_trial,'tData');
-    save([dirs.ses, filesep, 'expParams'],'expParams')
+    save([dirs.run, filesep, 'expParams'],'expParams')
 end
 
 release(headwrite);
