@@ -401,15 +401,16 @@ end
 
 %% load stim list and create trial table
 % root path is where the subject description files are
+filestring = sprintf('sub-%s_ses-%d_run-%s_task-%s_',expParams.subject, expParams.session, expParams.runstring, expParams.task); % string to be used in multiple file names
 dirs.ses = [expParams.root, filesep, sprintf('sub-%s',expParams.subject), filesep, sprintf('ses-%d',expParams.session)];
-dirs.run = [dirs.ses, filesep, 'run-',expParams.runstring]; % put trial data files here
-    mkdir(dirs.run) % make folder for this run - probably does not exist yet
 dirs.stim_audio = [dirs.ses, filesep, 'stim_audio']; 
 dirs.task = [dirs.ses, filesep, 'beh', filesep, expParams.task]; 
-dirs.trial_table_filename = [dirs.task, filesep, 'sub-%s_ses-%d_run-%s_task-%s_trials.tsv']; 
+dirs.run = [dirs.task, filesep, 'run-',expParams.runstring]; % put trial data files here
+    mkdir(dirs.run) % make folder for this run - probably does not exist yet
+dirs.trial_table_filename = [dirs.task, filesep, filestring, 'trials.tsv']; 
 expParams.dirs = dirs; 
-unique_answers_file  = fullfile(dirs.task,sprintf('sub-%s_ses-%d_run-%s_task-%s_qa-list.tsv',expParams.subject, expParams.session, expParams.runstring, expParams.task));
-Output_name = fullfile(dirs.task,sprintf('sub-%s_ses-%d_run-%s_task-%s_desc-presentation.mat',expParams.subject, expParams.session, expParams.runstring, expParams.task));
+unique_answers_file  = fullfile(dirs.task,[filestring, 'qa-list.tsv']);
+Output_name = fullfile(dirs.task,[filestring, 'desc-presentation.mat']);
 if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite',...
         questdlg(sprintf('This subject %s already has an data file for this ses-%d_run-%s (task: %s), do you want to over-write?',...
         expParams.subject, expParams.session, expParams.runstring, expParams.task),...
@@ -476,8 +477,8 @@ if expParams.n_base_trials > 0    % skip this section if there are no baseline t
 elseif expParams.n_base_trials == 0
     trials = trials_speech;
 end
-
-
+trials.trialnum = [1:height(trials)]';
+trials = movevars(trials,{'trialnum','basetrial','answer','question','stimfile','n_syls'},'Before',1);
 
 %% audio device setup
 % sometimes focusrite devices get slightly modified names, like 
@@ -1136,8 +1137,7 @@ for itrial = 1:expParams.ntrials
 
     % fName_trial will be used for individual trial files (which will
     % live in the run folder)
-    fName_trial = fullfile(dirs.run,sprintf('sub-%s_ses-%d_run-%s_task-%s_trial-%d.mat',...
-        expParams.subject, expParams.session, expParams.runstring, expParams.task,itrial));
+    fName_trial = fullfile(dirs.run,[filestring, sprintf('trial-%d.mat',itrial)]);
     save(fName_trial,'tData');
     writetable(trials, dirs.trial_table_filename, 'FileType','text','Delimiter','tab') % update trial table with timing data each trial
 
@@ -1162,7 +1162,7 @@ close(setdiff(findall(0, 'Type', 'figure'), hfig_cam_blocker)); % close all exce
 % experiment time
 expParams.elapsed_time = toc(ET)/60;    % elapsed time of the experiment
 fprintf('\nElapsed Time: %f (min)\n', expParams.elapsed_time)
-save(Output_name, 'expParams', 'trialData');
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % save(Output_name, 'expParams', 'trialData');
 
 % number of trials with voice onset detected
 onsetCount = nan(expParams.ntrials,1);
