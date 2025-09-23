@@ -49,7 +49,8 @@ else % analyzing on a local machine
             dirs.projrepo = [pkgdir filesep 'stut_obs']; 
             dirs.spm = [pkgdir filesep 'spm12'];
             dirs.conn = [pkgdir filesep 'conn'];
-            dirs.data = ['C:\ieeg_stut'];  % source data
+            % dirs.data = ['C:\ieeg_stut'];  % source data
+            dirs.data = ['C:\STUTObs']; 
         
         case {'samhansen'}
             dirs.data = ['/Users/samhansen/Documents/MATLAB/Guenther/data/ieeg_stut'];
