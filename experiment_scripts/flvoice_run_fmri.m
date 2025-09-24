@@ -747,6 +747,8 @@ for itrial = 1:expParams.ntrials
 
     %% show trial info to questioner, handle camera view
     trialData(itrial).question = trials.question{itrial};
+    trialData(itrial).answer = trials.answer{itrial}; % for later analysis
+    trialData(itrial).n_syls = trials.n_syls{itrial}; % for later analysis
     stimread = trials.question{itrial}; 
 
     % print current trial stim command line for the investigator to read... also (optionally) upcoming stimulus questions
