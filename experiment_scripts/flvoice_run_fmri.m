@@ -401,7 +401,7 @@ end
 
 %% load stim list and create trial table
 % root path is where the subject description files are
-filestring = sprintf('sub-%s_ses-%d_run-%s_task-%s_',expParams.subject, expParams.session, expParams.runstring, expParams.task); % string to be used in multiple file names
+filestring = sprintf('sub-%s_ses-%d_task-%s_run-%s_',expParams.subject, expParams.session, expParams.task, expParams.runstring); % string to be used in multiple file names
 dirs.ses = [expParams.root, filesep, sprintf('sub-%s',expParams.subject), filesep, sprintf('ses-%d',expParams.session)];
 dirs.stim_audio = [dirs.ses, filesep, 'stim_audio']; 
 dirs.task = [dirs.ses, filesep, 'beh', filesep, expParams.task]; 
@@ -412,8 +412,8 @@ expParams.dirs = dirs;
 unique_answers_file  = fullfile(dirs.task,[filestring, 'qa-list.tsv']);
 Output_name = fullfile(dirs.task,[filestring, 'desc-presentation.mat']);
 if ~isempty(dir(Output_name))&&~isequal('Yes - overwrite',...
-        questdlg(sprintf('This subject %s already has an data file for this ses-%d_run-%s (task: %s), do you want to over-write?',...
-        expParams.subject, expParams.session, expParams.runstring, expParams.task),...
+        questdlg(sprintf('This subject %s already has an data file for this ses-%d task-%s run-%s , do you want to over-write?',...
+        expParams.subject, expParams.session, expParams.task, expParams.runstring),...
         'Answer', 'Yes - overwrite', 'No - quit','No - quit')), return; 
 end
 

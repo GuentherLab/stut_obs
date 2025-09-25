@@ -79,7 +79,9 @@ end
 dirs.stim = [dirs.projrepo, filesep, 'stimuli'];
 dirs.audio_common = [dirs.stim, filesep, 'audio']; % audio files shared across subjects
 dirs.config = fullfile(dirs.projrepo, 'config');  % configuration files
-dirs.derivatives = [dirs.data, filesep, 'der']; % derivatives of source data
+dirs.derivatives = [dirs.data, filesep, 'derivatives']; % derivatives of source data
+dirs.trial_audio = [dirs.derivatives, filesep, 'trial-audio']; % speech responses audio for each trial
+dirs.annot = [dirs.derivatives, filesep, 'annot']; % annotation tables in derivatives (beh scoring etc)
 
 %% add paths to folders and subfolders
 paths_to_add = {dirs.projrepo;...

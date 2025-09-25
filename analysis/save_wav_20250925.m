@@ -11,7 +11,7 @@ nTrial = 60;
 dirs.sub = [dirs.data, filesep, 'sub-',sub];
 dirs.ses = [dirs.sub, filesep, 'ses-',num2str(ses)]; 
 dirs.task = [dirs.ses, filesep, 'beh', filesep,task]; 
-dirs.audio_trial_files = [dirs.derivatives, filesep, 'sub-',sub, filesep, 'trial-audio']; 
+dirs.audio_trial_files = [dirs.derivatives, filesep, 'sub-',sub, filesep, 'trial-audio']; % need to update this path
 
 if ~exist(dirs.audio_trial_files)
     mkdir(dirs.audio_trial_files)
