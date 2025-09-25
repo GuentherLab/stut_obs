@@ -20,8 +20,9 @@ end
 for run = [1:4] 
     runstring = sprintf(['%0',num2str(num_run_digits),'d'], run); % add zero padding
     filestring = sprintf('sub-%s_ses-%d_run-%s_task-%s_',sub, ses, runstring, expParams.task); % string to be used in multiple file names
+    dirs.run = [dirs.task, filesep, 'run-',runstring];
     for itrial = 1:2:nTrial % skip interleaved baseline trials
-        dirs.run = [dirs.task, filesep, 'run-',runstring];
+        
         load([dirs.run, filesep, filestring,'trial-',num2str(itrial), '.mat']); 
         
         % sti = strrep(strrep(desc{j}, '/', '-'), '\', '-');
